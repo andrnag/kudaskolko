@@ -9,8 +9,15 @@ $GROUP_TYPES[
 	$.CHEQUE(1)
 ]
 $TYPES[
+^rem{ расход/списание }
 	$.CHARGE(1)
+^rem{ доход/начисление }
 	$.INCOME(2)
+^rem{ установка баланса на счете }
+	$.STATEMENT(4)
+	^rem{ операция со счетом }
+	$.ACCOUNT(8)
+^rem{ чек }
 	$.CHEQUE(64)
 ]
 $oSql[]
@@ -27,6 +34,10 @@ $USERID($iUserID)
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
 	VALUES ('Доходы', $TYPES.INCOME, $USERID)
+}
+^oSql.void{
+	INSERT INTO items (name, type, user_id)
+	VALUES ('Счета', $TYPES.ACCOUNT, $USERID)
 }
 ^dbo:rebuildNestingData[]
 
@@ -54,7 +65,12 @@ $hResult[^hash::create[]]
 		i.user_id = $USERID
 		AND i.name = '$hParams.name'
 		^if(^hParams.type.int(0)){
-			AND nd.type = ^hParams.type.int(0)
+			AND nd.type = 
+			^if((^hParams.type.int(0) & $dbo:TYPES.ACCOUNT) == $dbo:TYPES.ACCOUNT){
+			$dbo:TYPES.ACCOUNT
+			}{
+				^hParams.type.int(0)
+			}
 		}
 		AND nd.iid = nd.pid
 		ORDER BY nd.type,nd.level
@@ -88,12 +104,18 @@ $hResult[^hash::create[]]
 		}
 
 		^if(!^hParams.pid.int(0)){
+			^rem{ если родитель не передан, то достанем корневого родителя по типу (Расходы, Доходы или Счета)}
 			$hParams.pid(^oSql.int{
 				SELECT iid
 				FROM items 
 				WHERE 
 				user_id = $USERID AND
-				type = ^hParams.type.int($dbo:TYPES.CHARGE)
+				type =
+				^if((^hParams.type.int(0) & $dbo:TYPES.ACCOUNT) == $dbo:TYPES.ACCOUNT){
+					^hParams.type.int($dbo:TYPES.ACCOUNT)
+				}{
+					^hParams.type.int($dbo:TYPES.CHARGE)
+				}
 				}[$.default(0)$.limit(1)])
 			}
 
@@ -371,17 +393,9 @@ $hResult[^hash::create[]]
 			$USERID,
 			^hParams.ctid.int(0),
 			^hParams.is_displayed.int(1),
-
-			^if( (^hParams.type.int(0) & $TYPES.CHARGE) == $TYPES.CHARGE ||
-			(^hParams.type.int(0) & $TYPES.INCOME) == $TYPES.INCOME ){
-				^hParams.type.int(0)
-			}{
-				^if(^hParams.amount.double(0) < 0){
-					^hParams.type.int(0) | $TYPES.CHARGE
-				}{
-					^hParams.type.int(0) | $TYPES.INCOME
-				}
-			}
+			^hParams.type.int(^if(^hParams.amount.double(0) < 0;$TYPES.CHARGE;$TYPES.INCOME))
+# 			^calculateTransactionType(^hParams.type.int(0);^hParams.amount.double(0))	
+			
 		)}
 	
 			$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
@@ -419,6 +433,16 @@ $iLastInsert	^hParams.iid.int(0)}]
 }
 $result[^hash::create[$hResult]]
 
+@calculateTransactionType[iType;dAmount][result]
+^if($iType != 0){
+	$result($iType)
+}{
+	^if($dAmount < 0){
+		$result($iType | $TYPES.CHARGE)
+	}{
+		$result($iType | $TYPES.INCOME)
+	}
+}
 
 @getGroupsForTransactions[hParams]
 $hParams[^hash::create[$hParams]]
@@ -969,6 +993,26 @@ $hParams[^hash::create[$hParams]]
 		t.ctid = ^hParams.ctid.int(0)
 	})
 }
+
+
+@getAccounts[hParams][tEntries]
+$hParams[^hash::create[$hParams]]
+$result[^oSql.table{
+SELECT
+	i.name AS name,
+	SUM(t.amount) AS sum
+FROM items i
+LEFT JOIN transactions t ON t.iid = i.iid
+LEFT JOIN items parent_item ON i.pid = parent_item.iid
+
+WHERE
+	i.user_id = $USERID AND
+	t.user_id = $USERID AND
+	parent_item.type = $TYPES.ACCOUNT
+
+GROUP BY
+	i.name
+}]
 
 @rebuildNestingDataLocal[hParams][locals]
 $hParams[^hash::create[$hParams]]

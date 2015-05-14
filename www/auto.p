@@ -1,3 +1,4 @@
+
 @auto[]
 ^use[/../classes/utils.p]
 $hRusageStat[^hash::create[]]
@@ -118,6 +119,7 @@ $result[$sBody]
 }{
 	<span class="home">Куда сколько</span>
 }
+^transaction:printAccounts[]
 # <span><u>Куда сколько</u></span>
 ^if($oAuth.is_logon){<span class="user">$oAuth.user.name ^oAuth.htmlFormLogout[]</span>}{
 
