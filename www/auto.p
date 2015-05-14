@@ -119,7 +119,7 @@ $result[$sBody]
 }{
 	<span class="home">Куда сколько</span>
 }
-^transaction:printAccounts[]
+^if($oAuth.is_logon){^transaction:printAccounts[]}
 # <span><u>Куда сколько</u></span>
 ^if($oAuth.is_logon){<span class="user">$oAuth.user.name ^oAuth.htmlFormLogout[]</span>}{
 
