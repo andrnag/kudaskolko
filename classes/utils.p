@@ -3,7 +3,7 @@ u
 
 @USE
 common/dtf.p
-TransactionType.p
+transaction/TransactionType.p
 
 @isEqualIgnoreCase[s1;s2]
 $result(^u:upper[$s1] eq ^u:upper[$s2])
