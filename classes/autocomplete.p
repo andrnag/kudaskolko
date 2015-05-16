@@ -1,10 +1,6 @@
 @CLASS
 autocomplete
 
-@USE
-utils.p
-dbo.p
-
 @OPTIONS
 locals
 
@@ -64,7 +60,7 @@ $result[^oSql.table{
 	^if($isSubItem){
 		CONCAT('- ',i.name)
 	}{
-		CONCAT(IF(t.type & $dbo:TYPES.CHEQUE <> 0,'@',''), i.name)
+		CONCAT(IF(t.type & $TransactionType:CHEQUE <> 0,'@',''), i.name)
 	} AS value,
 	i.iid
 
@@ -75,7 +71,7 @@ $result[^oSql.table{
 	i.user_id = $dbo:USERID AND
 	i.is_auto_generated = 0 AND
 	^if($isCheque){
-		t.type & $dbo:TYPES.CHEQUE = $dbo:TYPES.CHEQUE
+		t.type & $TransactionType:CHEQUE = $TransactionType:CHEQUE
 		AND
 	}
 	(

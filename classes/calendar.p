@@ -2,9 +2,7 @@
 calendar
 
 @USE
-utils.p
-dbo.p
-common/dtf.p
+TransactionType.p
 
 @auto[]
 $data[^hash::create[]]
@@ -241,10 +239,10 @@ $sDate[^dtf:format[%h;$v]]
 		<div class="bar-container ^if($hMonthsSum.[1$k].sum + $hMonthsSum.[2$k].sum == 0){ empty}">
 #		^if(def $sFullSumm){ title="$sFullSumm"}>
 
-		^printBars[$hMonthsSum.[1$k].sum;$hSums.1.dTotalSum;minus one;$dbo:TYPES.CHARGE;0]
-		^printBars[$hMonthsSum.[2$k].sum;$dTotalSum;plus both;$dbo:TYPES.INCOME;^if($data.ciid != 0){0}]
-		^printBars[$hMonthsSum.[2$k].sum;$hSums.2.dTotalSum;plus one;$dbo:TYPES.INCOME;0]
-		^printBars[$hMonthsSum.[1$k].sum;$dTotalSum;minus both;$dbo:TYPES.CHARGE;^if($data.ciid != 0){0}]
+		^printBars[$hMonthsSum.[1$k].sum;$hSums.1.dTotalSum;minus one;$TransactionType:CHARGE;0]
+		^printBars[$hMonthsSum.[2$k].sum;$dTotalSum;plus both;$TransactionType:INCOME;^if($data.ciid != 0){0}]
+		^printBars[$hMonthsSum.[2$k].sum;$hSums.2.dTotalSum;plus one;$TransactionType:INCOME;0]
+		^printBars[$hMonthsSum.[1$k].sum;$dTotalSum;minus both;$TransactionType:CHARGE;^if($data.ciid != 0){0}]
 # 		$sSum[^u:formatValue($hMonthsSum.[$k].sum;true)]
 # 		^if(!^data.pid.int(0)){
 # 			$sFullSumm[$sSum]
@@ -313,7 +311,7 @@ $result(def $request:query && ($data.dtNow != $data.currentDate || $data.startDa
 $sSum[^u:formatValueByType($iMonthSum;$iType;true)]
 ^if(!^data.pid.int(0) && ^isOnlyKilos.int(1)){
 # 	$sFullSumm[$sSum]
-	^if($iType == $dbo:TYPES.CHARGE){
+	^if($iType == $TransactionType:CHARGE){
 		$sSum[^u:formatValueByDivision($iMonthSum;1000;true)]
 	}{
 		$sSum[^u:formatValueByDivisionFloor($iMonthSum;1000;true)]
@@ -421,7 +419,7 @@ WHERE
 	^if($data.pid){
 		nd.pid = $data.pid
 	}{
-		(i.type = $dbo:TYPES.CHARGE OR i.type = $dbo:TYPES.INCOME)
+		(i.type = $TransactionType:CHARGE OR i.type = $TransactionType:INCOME)
 	}
 	AND t.is_displayed = 1
 	AND t.user_id = $USERID
@@ -468,13 +466,13 @@ $nextDateIsCurrent(true)
 	^if($form:operday eq $sOperdayForWeek){
 #		<div class="date active"><span>$sDate</span></div>
 	}{
-	^if($hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].sum || $hWeeks.[$dbo:TYPES.INCOME^tCalendar.week.int(-1)].sum){
+	^if($hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].sum || $hWeeks.[$TransactionType:INCOME^tCalendar.week.int(-1)].sum){
 	$st[^data.currentDate.sql-string[] >= ^dtMonday.sql-string[] && ^data.currentDate.sql-string[] <= ^dtSunday.sql-string[]]
 	^if(!$isActive){
 	<div class="week^if($isDefault){ default}">
 		<a ^rem{title="$st" }class="date^if($isActive){ active}"
 	href="?operday=$sOperdayForWeek^getURI[]"><span>$sDate</span></a>
-		<div class="amount">^u:formatValue[$hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].sum](true)</div>
+		<div class="amount">^u:formatValue[$hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].sum](true)</div>
 	</div>
 	}
 
@@ -487,7 +485,7 @@ $nextDateIsCurrent(true)
 		^if(!$isActive){
 		<div class="week^if($isDefault){ default}">
 	<div class="date nodata"><span>$sDate</span></div>
-	<div class="amount">^u:formatValue[$hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].sum](true)</div>
+	<div class="amount">^u:formatValue[$hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].sum](true)</div>
 	</div>
 }
 	}
@@ -496,13 +494,13 @@ $nextDateIsCurrent(true)
 #</div>
 ^if($isActive){
 	<div class="week extended">
-	<div class="date^if($form:operday eq $sOperdayForWeek){ active}^if(!$hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].sum && !$hWeeks.[$dbo:TYPES.INCOME^tCalendar.week.int(-1)].sum){ nodata}">
+	<div class="date^if($form:operday eq $sOperdayForWeek){ active}^if(!$hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].sum && !$hWeeks.[$TransactionType:INCOME^tCalendar.week.int(-1)].sum){ nodata}">
 	^daySelector[$dtMonday;$dtSunday;
-	^eval($hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].weekdays | $hWeeks.[$dbo:TYPES.INCOME^tCalendar.week.int(-1)].weekdays)
+	^eval($hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].weekdays | $hWeeks.[$TransactionType:INCOME^tCalendar.week.int(-1)].weekdays)
 
 	]</div>
 # 	<div class="clear"></div>
-	<div class="amount">^u:formatValue[$hWeeks.[$dbo:TYPES.CHARGE^tCalendar.week.int(-1)].sum](true)</div>
+	<div class="amount">^u:formatValue[$hWeeks.[$TransactionType:CHARGE^tCalendar.week.int(-1)].sum](true)</div>
 	</div>
 }
 }

@@ -50,8 +50,8 @@ $dbo:IS_LOCAL($IS_LOCAL)
 ^use[/../classes/common/dtf.p]
 ^use[/../classes/calendar.p]
 ^use[/../classes/action.p]
-^use[/../classes/transaction.p]
-^use[/../classes/transactionlist.p]
+^use[/../classes/transaction/transaction.p]
+^use[/../classes/transaction/transactionlist.p]
 ^use[/../classes/common/array.p]
 
 $oCalendar[^calendar::create[$.USERID($USERID)]]
@@ -120,7 +120,7 @@ $result[$sBody]
 	<span class="home">Куда сколько</span>
 }
 ^if($oAuth.is_logon){
-	^use[/../classes/transaction.p]
+	^use[/../classes/transaction/transaction.p]
 	^transaction:printAccounts[]}
 # <span><u>Куда сколько</u></span>
 ^if($oAuth.is_logon){<span class="user">$oAuth.user.name ^oAuth.htmlFormLogout[]</span>}{
@@ -160,7 +160,7 @@ $result[$sBody]
 ^rem{ используется для ускорения ajax-запросов, не требующих работы с бд и авторизации }
 ^switch[$form:action]{
 	^case[out]{
-		^use[/../classes/transaction.p]
+		^use[/../classes/transaction/transaction.p]
 		^transaction:processMoneyOut[
 			$.sData[$form:transactions]
 			$.isPreview(def $form:preview)

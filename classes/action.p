@@ -1,17 +1,8 @@
 @CLASS
 action
 
-
-@USE
-utils.p
-dbo.p
-common/dtf.p
-
 @OPTIONS
 locals
-
-@auto[]
-$data[^hash::create[]]
 
 @create[hParams]
 $self.hPage[$hParams.hPage]
@@ -377,9 +368,9 @@ $self.hPage.sTitle[$tValues.name]
 
 $value(^if((def $tValues.countOfEntries && $tValues.countOfEntries > 1) 
 	|| 
-	($tValues.type & $dbo:TYPES.CHARGE == $dbo:TYPES.CHARGE)
+	($tValues.type & $TransactionType:CHARGE == $TransactionType:CHARGE)
 	|| 
-	($tValues.type & $dbo:TYPES.INCOME == $dbo:TYPES.INCOME) ){0}{1})
+	($tValues.type & $TransactionType:INCOME == $TransactionType:INCOME) ){0}{1})
 
 <h2>Переименовать 
 ^if(def $tValues.countOfEntries && $tValues.countOfEntries > 1){

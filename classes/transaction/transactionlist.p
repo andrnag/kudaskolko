@@ -1,11 +1,6 @@
 @CLASS
 transactionlist
 
-@USE
-utils.p
-dbo.p
-common/dtf.p
-
 @auto[]
 $data[^hash::create[]]
 
@@ -50,16 +45,16 @@ $iType(^form:type.int(0))
 }
 
 <div class="transactions">
-^if($iType == 0 || $iType == $dbo:TYPES.CHARGE){
+^if($iType == 0 || $iType == $TransactionType:CHARGE){
 <div id="charges">^printTransactionByType[
-	$.type[$dbo:TYPES.CHARGE]
+	$.type[$TransactionType:CHARGE]
 	$.title[Расходы]
 	$.title2[расходов]
 ]</div>
 }
-^if(($iType == 0 && !^form:ctid.int(0)) || $iType == $dbo:TYPES.INCOME){
+^if(($iType == 0 && !^form:ctid.int(0)) || $iType == $TransactionType:INCOME){
 <div id="incomes">^printTransactionByType[
-	$.type[$dbo:TYPES.INCOME]
+	$.type[$TransactionType:INCOME]
 	$.title[Доходы]
 	$.title2[доходов]
 ]</div>
@@ -190,7 +185,7 @@ $h.iTotalSum(^dbo:getTotalOut[
 			$hCurrent.name[$tEntries.extraname]
 		}
 
-		^if(def $tEntries.tiname && ($tEntries.type & $dbo:TYPES.CHEQUE) != $dbo:TYPES.CHEQUE){
+		^if(def $tEntries.tiname && ($tEntries.type & $TransactionType:CHEQUE) != $TransactionType:CHEQUE){
 			$hCurrent.tiname[$tEntries.tiname]
 			$hCurrent.ctid[$tEntries.ctid]
 			$hCurrent.ciid[$tEntries.ciid]

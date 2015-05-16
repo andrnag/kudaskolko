@@ -1,43 +1,23 @@
 @CLASS
 dbo
 
-@USE
-utils.p
-
 @auto[]
-$GROUP_TYPES[
-	$.CHEQUE(1)
-]
-$TYPES[
-^rem{ расход/списание }
-	$.CHARGE(1)
-^rem{ доход/начисление }
-	$.INCOME(2)
-^rem{ установка баланса на счете }
-	$.STATEMENT(4)
-	^rem{ операция со счетом }
-	$.ACCOUNT(8)
-^rem{ чек }
-	$.CHEQUE(64)
-]
 $oSql[]
-
-$data[^hash::create[]]
 $USERID[]
 
 @initUser[iUserID]
 $USERID($iUserID)
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
-	VALUES ('Расходы', $TYPES.CHARGE, $USERID)
+	VALUES ('Расходы', $TransactionType:CHARGE, $USERID)
 }
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
-	VALUES ('Доходы', $TYPES.INCOME, $USERID)
+	VALUES ('Доходы', $TransactionType:INCOME, $USERID)
 }
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
-	VALUES ('Счета', $TYPES.ACCOUNT, $USERID)
+	VALUES ('Счета', $TransactionType:ACCOUNT, $USERID)
 }
 ^dbo:rebuildNestingData[]
 
@@ -66,8 +46,8 @@ $hResult[^hash::create[]]
 		AND i.name = '$hParams.name'
 		^if(^hParams.type.int(0)){
 			AND nd.type = 
-			^if((^hParams.type.int(0) & $dbo:TYPES.ACCOUNT) == $dbo:TYPES.ACCOUNT){
-			$dbo:TYPES.ACCOUNT
+			^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
+			$TransactionType:ACCOUNT
 			}{
 				^hParams.type.int(0)
 			}
@@ -111,10 +91,10 @@ $hResult[^hash::create[]]
 				WHERE 
 				user_id = $USERID AND
 				type =
-				^if((^hParams.type.int(0) & $dbo:TYPES.ACCOUNT) == $dbo:TYPES.ACCOUNT){
-					^hParams.type.int($dbo:TYPES.ACCOUNT)
+				^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
+					^hParams.type.int($TransactionType:ACCOUNT)
 				}{
-					^hParams.type.int($dbo:TYPES.CHARGE)
+					^hParams.type.int($TransactionType:CHARGE)
 				}
 				}[$.default(0)$.limit(1)])
 			}
@@ -135,7 +115,7 @@ $hResult[^hash::create[]]
 		$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
 
 		$hResult.tValues[^table::create{iid	pid	alias_id	type
-$iLastInsert	^hParams.pid.int(0)		^hParams.type.int($dbo:TYPES.CHARGE)}]
+$iLastInsert	^hParams.pid.int(0)		^hParams.type.int($TransactionType:CHARGE)}]
 
 	^rebuildNestingDataLocal[
 		$.iid($hResult.tValues.iid)
@@ -393,7 +373,7 @@ $hResult[^hash::create[]]
 			$USERID,
 			^hParams.ctid.int(0),
 			^hParams.is_displayed.int(1),
-			^hParams.type.int(^if(^hParams.amount.double(0) < 0;$TYPES.CHARGE;$TYPES.INCOME))
+			^hParams.type.int(^if(^hParams.amount.double(0) < 0;$TransactionType:CHARGE;$TransactionType:INCOME))
 # 			^calculateTransactionType(^hParams.type.int(0);^hParams.amount.double(0))	
 			
 		)}
@@ -438,9 +418,9 @@ $result[^hash::create[$hResult]]
 	$result($iType)
 }{
 	^if($dAmount < 0){
-		$result($iType | $TYPES.CHARGE)
+		$result($iType | $TransactionType:CHARGE)
 	}{
-		$result($iType | $TYPES.INCOME)
+		$result($iType | $TransactionType:INCOME)
 	}
 }
 
@@ -689,7 +669,7 @@ LEFT JOIN nesting_data nd ON nd.iid = t.iid
 WHERE
 	ct.iid = ^hParams.ciid.int(0)
 	AND nd.iid = nd.pid
-	AND nd.type = ^hParams.type.int($dbo:TYPES.CHARGE)
+	AND nd.type = ^hParams.type.int($TransactionType:CHARGE)
 	AND t.user_id = $USERID
 ^if(^hParams.startOperday.int(0) != 0 && ^hParams.endOperday.int(0) != 0){
 	^if(^hParams.startOperday.int(0) == ^hParams.endOperday.int(0)){
@@ -746,7 +726,7 @@ LEFT JOIN items last_parent ON last_parent.iid = last_parent_nd.iid
 #	 AND last_parent_nd.pid <> nd.pid
 	}
 WHERE
-transaction_for_last_parent_nd.type = ^hParams.type.int($dbo:TYPES.CHARGE)
+transaction_for_last_parent_nd.type = ^hParams.type.int($TransactionType:CHARGE)
 AND t2.user_id = $USERID
  AND i.user_id = $USERID AND
 (last_parent_nd.level = transaction_for_last_parent_nd.level-1 
@@ -872,7 +852,7 @@ WHERE
 			user_id = $USERID AND type = ^hParams.type.int(0))
 # 		AND parent_item.type & ^hParams.type.int(0) = ^hParams.type.int(0)
 	}
-# 	^if($hParams.type & $TYPES.CHARGE == $TYPES.CHARGE){
+# 	^if($hParams.type & $TransactionType:CHARGE == $TransactionType:CHARGE){
 # 		AND (i.iid = 2058 OR i.pid = 2058)
 # 	}{
 # 		AND (i.iid = 2057 OR i.pid = 2057)
@@ -1008,7 +988,7 @@ LEFT JOIN items parent_item ON i.pid = parent_item.iid
 WHERE
 	i.user_id = $USERID AND
 	t.user_id = $USERID AND
-	parent_item.type = $TYPES.ACCOUNT
+	parent_item.type = $TransactionType:ACCOUNT
 
 GROUP BY
 	i.name
