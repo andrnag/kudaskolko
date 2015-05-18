@@ -10,6 +10,7 @@ $sOriginalInput[^form:term.lower[]]
 $sInput[$sOriginalInput]
 $sFirst[^sInput.left(1)]
 $isCheque($sFirst eq "@" || $sFirst eq "^"")
+$isAccount($sFirst eq "^$" || $sFirst eq "^;")
 $isSubItem($sFirst eq "-")
 $sInput[^trimPrefixes[$sInput]]
 
@@ -23,7 +24,7 @@ $sInput[^trimPrefixes[$sInput]]
 		^addPopularGoodsForPrices[$tResult;$sInput]
 	}
 	
-	$tResultFromDB[^getEntries[$isSubItem;$isCheque;$sInput;$sChangedInput]]
+	$tResultFromDB[^getEntries[$isSubItem;$isCheque;$sInput;$sChangedInput;$isAccount]]
 
 	^if($tResultFromDB){
 
@@ -53,14 +54,16 @@ $sInput[^trimPrefixes[$sInput]]
 }
 
 
-@getEntries[isSubItem;isCheque;sInput;sChangedInput]
+@getEntries[isSubItem;isCheque;sInput;sChangedInput;isAccount]
 $result[^oSql.table{
 	SELECT
 
 	^if($isSubItem){
 		CONCAT('- ',i.name)
 	}{
-		CONCAT(IF(t.type & $TransactionType:CHEQUE <> 0,'@',''), i.name)
+		CONCAT(IF(t.type & $TransactionType:CHEQUE <> 0,'@',
+			IF(t.type & $TransactionType:ACCOUNT <> 0,'^$','')
+			), i.name)
 	} AS value,
 	i.iid
 
@@ -72,6 +75,10 @@ $result[^oSql.table{
 	i.is_auto_generated = 0 AND
 	^if($isCheque){
 		t.type & $TransactionType:CHEQUE = $TransactionType:CHEQUE
+		AND
+	}
+	^if($isAccount){
+		t.type & $TransactionType:ACCOUNT = $TransactionType:ACCOUNT
 		AND
 	}
 	(
@@ -147,6 +154,7 @@ $tParts[^sInput.match[^^\s*(\d+)\s*(?:\*\s*(\d+)\s*)?^$][gmxi]]
 		AND i.is_auto_generated = 0
 		AND t.amount = ^tParts.1.int(0)
 		AND t.tdate > DATE_SUB(NOW(), INTERVAL 4 MONTH)
+		AND t.type & $TransactionType:ACCOUNT = 0
 		GROUP BY i.iid, t.quantity
 		ORDER BY cnt desc
 		}[$.limit(5)]
@@ -183,6 +191,7 @@ $result[^oSql.table{
 	AND i.is_auto_generated = 0
 	AND t.tdate > DATE_SUB(NOW(),INTERVAL 6 MONTH)
 	AND amount <> 0
+	AND t.type & $TransactionType:ACCOUNT = 0
 	GROUP BY t.amount
 	ORDER BY cnt desc
 	}[$.limit(3)]
@@ -327,4 +336,4 @@ $result[^selectFrom[$sFirst;^table::create{value
 послезавтра}]]
 
 @trimPrefixes[sInput]
-$result[^sInput.trim[left;^@ -]]
+$result[^sInput.trim[left;^@ -^$^;^"]]

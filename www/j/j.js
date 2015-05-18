@@ -133,7 +133,7 @@ $(function() {
 					result += $.ui.autocomplete.escapeRegex(splitted[i]);
 				};
 
-				var matcher = new RegExp("(\\s+|^|@|\\(|\\-)(" + $.ui.autocomplete.escapeRegex(t) + result+")", "ig" );
+				var matcher = new RegExp("(\\s+|^|@|\\$|\\(|\\-)(" + $.ui.autocomplete.escapeRegex(t) + result+")", "ig" );
 						
 				if(item.iid && item.iid != 'undefined'){
 					var $anchor = $( "<div ><u>Все записи</u></div>" )

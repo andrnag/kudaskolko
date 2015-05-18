@@ -44,13 +44,16 @@ $hResult[^hash::create[]]
 		WHERE 
 		i.user_id = $USERID
 		AND i.name = '$hParams.name'
+		AND nd.type
 		^if(^hParams.type.int(0)){
-			AND nd.type = 
+			 = 
 			^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
-			$TransactionType:ACCOUNT
+				$TransactionType:ACCOUNT
 			}{
 				^hParams.type.int(0)
 			}
+		}{
+		  <> $TransactionType:ACCOUNT
 		}
 		AND nd.iid = nd.pid
 		ORDER BY nd.type,nd.level
@@ -91,10 +94,15 @@ $hResult[^hash::create[]]
 				WHERE 
 				user_id = $USERID AND
 				type =
+
 				^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
 					^hParams.type.int($TransactionType:ACCOUNT)
 				}{
-					^hParams.type.int($TransactionType:CHARGE)
+					^if(^hParams.type.int(0) != 0){
+						^hParams.type.int(0)
+					}{
+						$TransactionType:CHARGE
+					}
 				}
 				}[$.default(0)$.limit(1)])
 			}
@@ -319,99 +327,120 @@ $result[^hash::create[$hResult]]
 
 
 
+
 ^rem{ ************************* }
 ^rem{ *** createTransaction *** }
 ^rem{ ************************* }
 @createTransaction[hParams]
-$dtNow[^date::now[]]
 $hParams[^hash::create[$hParams]]
 $hResult[^hash::create[]]
-^if(^hParams.iid.int(0) != 0){
-
-		^if(!def $hParams.operday && def $hParams.tdate){
-			$hParams.operday[$hParams.tdate]
-		}
-		^if($hParams.doNotCreateOperday){
-			$hOperday[$.operday[$hParams.operday]]
-		}{
-			$hOperday[^createOperday[$.operday[$hParams.operday]]]
-		}
-
-
+^if(!def $hParams.operday && def $hParams.tdate){
+	$hParams.operday[$hParams.tdate]
+}
+^if($hParams.doNotCreateOperday){
+	$hOperday[$.operday[$hParams.operday]]
+}{
+	$hOperday[^createOperday[$.operday[$hParams.operday]]]
+}
+$tExistTransaction[]
+^if(^u:isEqualType(^hParams.type.int(0);$TransactionType:ACCOUNT)){
+	$tExistTransaction[^oSql.table{
+		SELECT tid, amount
+		FROM transactions
+		WHERE iid = ^hParams.iid.int(0)
+		AND user_id = $USERID
+		ORDER BY tdate DESC, dateadded DESC
+	}[$.limit(1)]]
+	^if(def $tExistTransaction){
 		^oSql.void{
-		INSERT INTO transactions (
-			operday,
-			iid,
-			alias_id,
-			tdate,
-			dateadded,
-			amount,
-			discount,
-			quantity,
-			user_id,
-			ctid,
-			is_displayed,
-			type)
-		VALUES (
-			$hOperday.operday,
-			^hParams.iid.int(0),
-			^hParams.alias_id.int(0),
-			"^u:getSQLStringDate[$hParams.tdate]",
-#			^if(def $hParams.tdate){
-#				'$hParams.tdate',
-#			}{
-#				'^dtNow.sql-string[]',
-#			}
-			^if(def $hParams.adate){
-				"^u:getSQLStringDate[$hParams.adate]",
-			}{
-				NOW(),
-			}
-			^math:abs(^hParams.amount.double(0)),
-			^hParams.discount.double(0),
-			^hParams.quantity.double(1.0),
-			$USERID,
-			^hParams.ctid.int(0),
-			^hParams.is_displayed.int(1),
-			^hParams.type.int(^if(^hParams.amount.double(0) < 0;$TransactionType:CHARGE;$TransactionType:INCOME))
-# 			^calculateTransactionType(^hParams.type.int(0);^hParams.amount.double(0))	
+		UPDATE transactions 
+			SET 
+			operday = $hOperday.operday,
 			
-		)}
-	
-			$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
-	
-		^if(def $hParams.gid){
-			$tGroupID[^table::create[nameless]{$hParams.gid}]
-			^tGroupID.menu{
-				^if(^tGroupID.0.int(0) != 0){
-					^oSql.void{
-						INSERT INTO transactions_in_groups (
-							tid,
-							gid
-						) values (
-							$iLastInsert,
-							^tGroupID.0.int(0)
-						)}
-				}
-			}
-	
+			tdate = "^u:getSQLStringDate[$hParams.tdate]",
+			dateadded = ^if(def $hParams.adate){
+				"^u:getSQLStringDate[$hParams.adate]"
+			}{
+				NOW()
+			},
+			amount = ^calculateTransactionAmount(
+				^math:abs(^hParams.amount.double(0));
+				^tExistTransaction.amount.double(0);
+				^hParams.type.int(0))
+			WHERE tid = $tExistTransaction.tid
+			
 		}
-	
-# 		$hResult.tValues[^oSql.table{
-# 			SELECT
-# 				tid,
-# 				iid
-# 			FROM transactions
-# 			WHERE tid = $iLastInsert
-# 		}[$.limit(1)]]
-
 		$hResult.tValues[^table::create{tid	iid
+$tExistTransaction.tid	^hParams.iid.int(0)}]
+
+		$result[^hash::create[$hResult]]
+	}
+}
+^if(!def $tExistTransaction){
+	^oSql.void{
+	INSERT INTO transactions (
+		operday,
+		iid,
+		alias_id,
+		tdate,
+		dateadded,
+		amount,
+		discount,
+		quantity,
+		user_id,
+		ctid,
+		is_displayed,
+		type)
+	VALUES (
+		$hOperday.operday,
+		^hParams.iid.int(0),
+		^hParams.alias_id.int(0),
+		"^u:getSQLStringDate[$hParams.tdate]",
+		^if(def $hParams.adate){
+			"^u:getSQLStringDate[$hParams.adate]",
+		}{
+			NOW(),
+		}
+		^math:abs(^hParams.amount.double(0)),
+		^hParams.discount.double(0),
+		^hParams.quantity.double(1.0),
+		$USERID,
+		^hParams.ctid.int(0),
+		^hParams.is_displayed.int(1),
+		^if(^u:isEqualType(^hParams.type.int(0);$TransactionType:ACCOUNT)){
+			^eval($TransactionType:ACCOUNT | $TransactionType:STATEMENT)
+		}{
+			^if(^hParams.type.int(0) != 0){
+				^hParams.type.int(0)
+			}{
+				^if(^hParams.amount.double(0) < 0;$TransactionType:CHARGE;$TransactionType:INCOME)
+			}
+		}
+		
+	)}
+
+		$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
+
+	$hResult.tValues[^table::create{tid	iid
 $iLastInsert	^hParams.iid.int(0)}]
 
-}{
-	$hResult.isError(true)
+	^if(^hParams.iid.int(0) == 0){
+		$result[$.isError(true)]
+	}{
+		$result[^hash::create[$hResult]]
+	}
 }
-$result[^hash::create[$hResult]]
+
+@calculateTransactionAmount[dAmount;dLastStatementSum;iType][result]
+^if(^u:isEqualType($iType;$TransactionType:STATEMENT)){
+	$result($dAmount)
+}{
+	^if(^u:isEqualType($iType;$TransactionType:CHARGE)){
+		$result(^u:max($dLastStatementSum - $dAmount;0))
+	}{
+		$result($dLastStatementSum + $dAmount)
+	}
+}
 
 @calculateTransactionType[iType;dAmount][result]
 ^if($iType != 0){
@@ -980,19 +1009,41 @@ $hParams[^hash::create[$hParams]]
 $result[^oSql.table{
 SELECT
 	i.name AS name,
-	SUM(t.amount) AS sum
-FROM items i
-LEFT JOIN transactions t ON t.iid = i.iid
+	t.amount AS sum
+FROM transactions t
+LEFT JOIN items i ON i.iid = t.iid
 LEFT JOIN items parent_item ON i.pid = parent_item.iid
-
-WHERE
-	i.user_id = $USERID AND
-	t.user_id = $USERID AND
-	parent_item.type = $TransactionType:ACCOUNT
-
-GROUP BY
-	i.name
+WHERE 
+t.user_id = $USERID AND
+parent_item.type = $TransactionType:ACCOUNT
+AND t.amount <> 0
+GROUP BY i.name
+ORDER BY i.name
 }]
+
+# @getAccounts[hParams][tEntries]
+# $hParams[^hash::create[$hParams]]
+# $result[^oSql.table{
+# SELECT
+# 	i.name AS name,
+# 	t.amount AS sum
+# FROM transactions t
+# LEFT JOIN items i ON i.iid = t.iid
+# LEFT JOIN (
+# 	SELECT MAX(t2.tid) tid 
+# 	FROM transactions t2
+# 	LEFT JOIN items i2 ON i2.iid = t2.iid
+# 	LEFT JOIN items parent_item ON i2.pid = parent_item.iid
+# 	WHERE
+# 		t2.user_id = $USERID AND
+# 		parent_item.type = $TransactionType:ACCOUNT
+# 	GROUP BY t2.iid
+# ) last ON last.tid = t.tid
+# WHERE last.tid IS NOT NULL
+# AND t.amount <> 0
+# ORDER BY
+# 	i.name
+# }]
 
 @rebuildNestingDataLocal[hParams][locals]
 $hParams[^hash::create[$hParams]]

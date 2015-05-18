@@ -86,7 +86,7 @@ $result[^regex::create[
 
 # вариант Молоко 300*2, Молоко 200, Молоко 200/3
 
-	(?:([-\+=])?([\d\.,]+|\([ \*\+\d\.,-]+\))) # 4.5 type 5 sAmount || sPrice || quantity || expression
+	(?:([-\+=]|=(?:\s*))?([\d\.,]+|\([ \*\+\d\.,-]+\))) # 4.5 type 5 sAmount || sPrice || quantity || expression
 
 	(?:
 		\s*
@@ -183,7 +183,6 @@ $hResult.sAmount[$h.sAmount]
 	$hResult.dAmountWithoutDisc($hResult.dAmount)
 
 	$hResult.iType(^calculateTransactionType[$h.type;$h.isChequeOrAccount1])
-
 }
 
 $hResult.isSubTransaction(def $h.isSubTransaction && def $hResult.dAmount)
