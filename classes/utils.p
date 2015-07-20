@@ -3,14 +3,26 @@ u
 
 @USE
 common/dtf.p
+transaction/TransactionType.p
 
-@capitalizeString[sString]
-$result[^sString.left(1)]
-$result[^result.upper[]]
-^if(^sString.length[] > 1){
-	$result[$result^sString.mid(1;^sString.length[])]
+@isEqualType[iFullType;iTypeToBeEqual]
+$result(($iFullType & $iTypeToBeEqual) == $iTypeToBeEqual)
+
+@isEqualIgnoreCase[s1;s2]
+$result(^u:upper[$s1] eq ^u:upper[$s2])
+
+@upper[sString]
+^try{
+	$result[^sString.upper[]]
+}{
+	^rem{ Защита от "какашек" - UTF-символов, на котороых падает upper.
+	Например, 💩 (%F0%9F%92%A9)}	
+	$exception.handled(true)
+ 	$result[$sString]
 }
 
+@capitalizeString[sString]
+$result[^upper[^sString.left(1)]^sString.mid(1;^sString.length[])]
 
 @getDateRange[dtStart;dtEnd;dtCurrent][dtNow]
 ^if(!def $dtEnd){
@@ -132,7 +144,6 @@ $result[$hResult]
 @getJustDate[date]
 $result[^date::create($date.year;$date.month;$date.day)]
 
-
 @getLastDay[date]
 $result[^date::create(^getFullYear($date.year);$date.month;^date:last-day(^getFullYear($date.year);$date.month))]
 
@@ -142,21 +153,39 @@ $result[^date::create($date.year;$date.month;1)]
 @getOperdayByDate[dtDate]
 $result[${dtDate.year}^dtDate.month.format[%02d]^dtDate.day.format[%02d]]
 
-@stringToDate[sDateTime;defaultDate][dtNow]
-$dtNow[^u:getJustDate[^date::now[]]]
+@getDateByShortName[sDateTime][locals]
+$iShift[]
 ^switch[^sDateTime.upper[]]{
 	^case[СЕГОДНЯ]{
-		$result[^date::create[$dtNow]]
+		$iShift(0)
 	}
 	^case[ВЧЕРА]{
-		^dtNow.roll[day](-1)
-		$result[^date::create[$dtNow]]
+		$iShift(-1)
 	}
 	^case[ПОЗАВЧЕРА]{
-		^dtNow.roll[day](-2)
-		$result[^date::create[$dtNow]]
+		$iShift(-2)
 	}
-	^case[DEFAULT]{
+	^case[ЗАВТРА]{
+		$iShift(+1)
+	}
+	^case[ПОСЛЕЗАВТРА]{
+		$iShift(+2)
+	}
+}
+^if(def $iShift){
+	$dtNow[^u:getJustDate[^date::now[]]]
+	^dtNow.roll[day]($iShift)
+	$result[^date::create[$dtNow]]
+}{
+	$result[]
+}
+
+@stringToDate[sDateTime;defaultDate][locals]
+$dtNow[^u:getJustDate[^date::now[]]]
+$resultDate[^getDateByShortName[$sDateTime]]
+^if(def $resultDate){
+	$result[$resultDate]
+}{
 # 				^u:p[$sDateTime]
 # 		$t[^sDateTime.match[(?:(\d\d)\.(\d\d)(?:\.(\d\d(?:\d\d)?))?)(?:\s+(\d\d)\:(\d\d)(?:\:(\d\d))?)?][g]]
 # 		$t[^sDateTime.match[(?:(\d\d)\.((?:0?[123456789]|[12][0-9]|3[01]))(?:\.(\d\d(?:\d\d)?))?)(?:\s+(\d\d)\:(\d\d)(?:\:(\d\d))?)?][g]]
@@ -262,7 +291,7 @@ $iYear(^sOperday.left(4))
 }
 
 @formatValueWithoutCeiling[dValue]
-$result[^numberFormat[$dValue;$.sThousandDivider[ ]$.sDecimalDivider[,]]]
+$result[^numberFormat[^eval(^math:round($dValue * 1000) / 1000);$.sThousandDivider[ ]$.sDecimalDivider[,]]]
 
 
 @formatValue[dValue;isOmitZeroes]
@@ -274,6 +303,24 @@ $result[^numberFormat[$dValue;$.sThousandDivider[ ]$.sDecimalDivider[,]]]
 	}{
 		$result[^numberFormat[^math:ceiling($dValue);$.iFracLength(0)$.sThousandDivider[ ]$.sDecimalDivider[,]]]
 	}
+}
+
+@formatValueFloor[dValue;isOmitZeroes]
+^if($dValue > 0 && $dValue < 1.0){
+	$result[^numberFormat[$dValue;$.iFracLength(2)$.sThousandDivider[ ]$.sDecimalDivider[,]]]
+}{
+	^if($dValue == 0 && def $isOmitZeroes){
+		$result[]
+	}{
+		$result[^numberFormat[^math:floor($dValue);$.iFracLength(0)$.sThousandDivider[ ]$.sDecimalDivider[,]]]
+	}
+}
+
+@formatValueByType[dValue;iType;isOmitZeroes]
+^if($iType & $TransactionType:INCOME == $TransactionType:INCOME){
+	^formatValueFloor[$dValue;isOmitZeroes]
+}{
+	^formatValue[$dValue;isOmitZeroes]
 }
 
 @formatQuantity[dValue]
@@ -351,7 +398,9 @@ $result($dDefault)
 		^case(1){$result(0.1)}
 		^case(2){$result(0.01)}
 		^case(3){$result(0.001)}
-		^case[DEFAULT]{$result(1)}
+		^case(4){$result(0.0001)}
+		^case(5){$result(0.00001)}
+		^case[DEFAULT]{$result(0.001)}
 }
 
 @round[dDouble;iFracLength]
@@ -362,6 +411,11 @@ $result(^math:round($dDouble*^_getPrecision($iFracLength)))
 @ceiling[dDouble;iFracLength]
 # 0-1, 1 - 0,1 2-0,01
 $result(^math:ceiling($dDouble/^_getPrecision($iFracLength))*^_getPrecision($iFracLength))
+
+
+@floor[dDouble;iFracLength]
+# 0-1, 1 - 0,1 2-0,01
+$result(^math:floor($dDouble/^_getPrecision($iFracLength))*^_getPrecision($iFracLength))
 
 
 ###########################################################################

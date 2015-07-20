@@ -1,178 +1,26 @@
 @CLASS
 dbo
 
-@USE
-utils.p
-
 @auto[]
-$GROUP_TYPES[
-	$.CHEQUE(1)
-]
-$TYPES[
-	$.CHARGE(1)
-	$.INCOME(2)
-	$.TRANSFER(4)
-	$.NEED_CLARIFICATION(16)
-	$.NEED_CONFIRMATION(32)
-	$.CHEQUE(64)
-	$.BANK(128)
-]
 $oSql[]
-
-$data[^hash::create[]]
 $USERID[]
 
 @initUser[iUserID]
 $USERID($iUserID)
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
-	VALUES ('Расходы', $TYPES.CHARGE, $USERID)
+	VALUES ('Расходы', $TransactionType:CHARGE, $USERID)
 }
 ^oSql.void{
 	INSERT INTO items (name, type, user_id)
-	VALUES ('Доходы', $TYPES.INCOME, $USERID)
+	VALUES ('Доходы', $TransactionType:INCOME, $USERID)
+}
+^oSql.void{
+	INSERT INTO items (name, type, user_id)
+	VALUES ('Счета', $TransactionType:ACCOUNT, $USERID)
 }
 ^dbo:rebuildNestingData[]
 
-@updateTransferTransaction[hParams]
-$hParams[^hash::create[$hParams]]
-^if(def $hParams.tid || ^hParams.iid.int(0) != 0 || ^hParams.alias_id.int(0) != 0){
-	^oSql.void{
-		UPDATE transactions t
-		LEFT JOIN transactions ct ON ct.tid = t.ctid
-		LEFT JOIN items i ON t.iid = i.iid
-		SET 
-			t.account_id_from = 1, ^rem{ наличный аккаунт текущего пользователя }
-			ct.account_id_to = 1, ^rem{ наличный аккаунт текущего пользователя }
-			t.account_id_to = ct.account_id_from,	
-			t.is_displayed = 1,
-			ct.is_displayed = 1,
-			ct.type = (ct.type &~ $TYPES.NEED_CLARIFICATION | $TYPES.TRANSFER),
-			
-			t.type = (t.type
-			
-			&~ $TYPES.NEED_CLARIFICATION
-			&~ $TYPES.CHEQUE 
-			&~ (t.type & $TYPES.CHARGE)
-			&~ (t.type & $TYPES.INCOME)
-#			&~ IF((t.type & $TYPES.CHARGE) = $TYPES.CHARGE,$TYPES.CHARGE,0)
-#			&~ IF((t.type & $TYPES.INCOME) = $TYPES.INCOME,$TYPES.INCOME,0)
-			| $TYPES.TRANSFER
-			| IF((ct.type & $TYPES.INCOME) = $TYPES.INCOME, $TYPES.NEED_CONFIRMATION, 0)
-			| IF((t.type & $TYPES.CHARGE) = $TYPES.CHARGE,$TYPES.INCOME,0)
-			| IF((t.type & $TYPES.INCOME) = $TYPES.INCOME,$TYPES.CHARGE,0)
-			)
-			
-#			t.type = (
- ^rem{ добавляем TRANSFER, снимаем Требует уточнения }			
-#			t.type | $TYPES.TRANSFER &~ $TYPES.NEED_CLARIFICATION
- ^rem{ требует подтверждения, если это расход для наличных }
-#	| IF((ct.type & $TYPES.INCOME) = $TYPES.INCOME,
-#			$TYPES.NEED_CONFIRMATION, &~ $TYPES.NEED_CONFIRMATION)
- ^rem{ меняем тип операции }
-#  | IF((t.type & $TYPES.CHARGE) = $TYPES.CHARGE,
- # 		(~ $TYPES.CHARGE | $TYPES.INCOME),(&~ $TYPES.INCOME | $TYPES.CHARGE))
-#			)
-		WHERE
-			t.user_id = $USERID
-			AND t.ctid != 0
-			AND (i.type & $TYPES.TRANSFER) = $TYPES.TRANSFER
-#			AND (t.type & $TYPES.TRANSFER) != $TYPES.TRANSFER
-#			AND (ct.type & $TYPES.TRANSFER) != $TYPES.TRANSFER
-		  
-		  ^if(def $hParams.tid && $hParams.tid is table){
-				AND t.tid IN (^hParams.tid.menu{^hParams.tid.0.int(0)}[,])
-			}{
-				^if(^hParams.tid.int(0)){
-					AND t.tid = ^hParams.tid.int(0)
-				}
-			}
-			^if(^hParams.iid.int(0)){
-					AND t.iid = ^hParams.iid.int(0)
-			}
-			^if(^hParams.alias_id.int(0)){
-					AND t.alias_id = ^hParams.alias_id.int(0)
-			}
-	}
-}
-
-
-
-@collapseChequeTransactions[hParams]
-$hParams[^hash::create[$hParams]]
-^if(def $hParams.tid || ^hParams.iid.int(0) != 0 || ^hParams.alias_id.int(0) != 0){
-	^oSql.void{
-		UPDATE transactions t
-		LEFT JOIN transactions ct ON
-			ct.operday = t.operday AND
-			ct.amount = t.amount
-			AND
-				(ct.tdate BETWEEN
-				DATE_SUB(t.tdate,INTERVAL 5 MINUTE)
-				AND
-				DATE_ADD(t.tdate,INTERVAL 5 MINUTE)
-				)
-			AND ct.tid != t.tid			
-			AND ct.is_displayed != t.is_displayed
-			AND ct.ctid != t.ctid
-		LEFT JOIN nesting_data tnd ON tnd.iid = t.iid
-		LEFT JOIN nesting_data ctnd ON ctnd.iid = ct.iid
-		SET 
-			t.is_displayed = IF(t.ctid = 0,0,2),
-			ct.is_displayed = IF(ct.ctid = 0,0,2),
-			ct.ctid = IFNULL(NULLIF(t.ctid,0),ct.ctid),
-			t.ctid = IFNULL(NULLIF(t.ctid,0),ct.ctid)
-		WHERE
-			(t.type & $TYPES.CHEQUE) = $TYPES.CHEQUE
-			AND (ct.type & $TYPES.CHEQUE) = $TYPES.CHEQUE
-		  AND ctnd.pid = tnd.pid
-		  
-		  ^if(def $hParams.tid && $hParams.tid is table){
-				AND t.tid IN (^hParams.tid.menu{^hParams.tid.0.int(0)}[,])
-			}{
-				^if(^hParams.tid.int(0)){
-					AND t.tid = ^hParams.tid.int(0)
-				}
-			}
-			^if(^hParams.iid.int(0)){
-					AND t.iid = ^hParams.iid.int(0)
-			}
-			^if(^hParams.alias_id.int(0)){
-					AND t.alias_id = ^hParams.alias_id.int(0)
-			}
-	}
-}
-^rem{DEPRECATED}
-@changeTransactionCategory[hParams][hItem]
-$hParams[^hash::create[$hParams]]
-
-$hItem[^createItem[$.name[$hParams.name]]]
-^if(^hParams.isForAll.int(0) == 1){
-	^oSql.void{
-		UPDATE items SET alias_id = $hItem.tValues.iid WHERE iid = ^hParams.iid.int(0)
-	}
-	^oSql.void{
-		UPDATE transactions
-		SET alias_id = iid,
-		iid = $hItem.tValues.iid
-		WHERE iid = ^hParams.iid.int(0)
-		AND user_id = $USERID
-	}
-# 	^dbo:collapseChequeTransactions[$.alias_id(^hParams.iid.int(0))]
-# 	^dbo:updateTransferTransaction[$.alias_id(^hParams.iid.int(0))]
-##		^dbo:rebuildNestingData[]
-}{
-	^oSql.void{
-		UPDATE transactions
-		SET iid = $hItem.tValues.iid
-		WHERE tid = ^hParams.tid.int(0)
-		AND user_id = $USERID
-	}
-# 	^dbo:collapseChequeTransactions[$.tid(^hParams.tid.int(0))]
-# 	^dbo:updateTransferTransaction[$.alias_id(^hParams.iid.int(0))]
-}
-^rebuildNestingData[]
-$result[^hash::create[$hItem]]
 
 ^rem{ *** Создание категории *** }
 @createItem[hParams][iLastInsert;hResult;hParams]
@@ -196,8 +44,16 @@ $hResult[^hash::create[]]
 		WHERE 
 		i.user_id = $USERID
 		AND i.name = '$hParams.name'
+		AND nd.type
 		^if(^hParams.type.int(0)){
-			AND nd.type & ^hParams.type.int(0) = ^hParams.type.int(0)
+			 = 
+			^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
+				$TransactionType:ACCOUNT
+			}{
+				^hParams.type.int(0)
+			}
+		}{
+		  <> $TransactionType:ACCOUNT
 		}
 		AND nd.iid = nd.pid
 		ORDER BY nd.type,nd.level
@@ -223,7 +79,7 @@ $hResult[^hash::create[]]
 				AND i.user_id = $USERID
 				AND i.name IN ($sFuzzy)
 				^if(^hParams.type.int(0)){
-					AND nd.type & ^hParams.type.int(0) = ^hParams.type.int(0)
+					AND nd.type = ^hParams.type.int(0)
 				}
 				ORDER BY nd.type, nd.level DESC
 				}[$.default(0)$.limit(1)])
@@ -231,12 +87,23 @@ $hResult[^hash::create[]]
 		}
 
 		^if(!^hParams.pid.int(0)){
+			^rem{ если родитель не передан, то достанем корневого родителя по типу (Расходы, Доходы или Счета)}
 			$hParams.pid(^oSql.int{
 				SELECT iid
 				FROM items 
 				WHERE 
 				user_id = $USERID AND
-				type & ^hParams.type.int($dbo:TYPES.CHARGE) = ^hParams.type.int($dbo:TYPES.CHARGE)
+				type =
+
+				^if((^hParams.type.int(0) & $TransactionType:ACCOUNT) == $TransactionType:ACCOUNT){
+					^hParams.type.int($TransactionType:ACCOUNT)
+				}{
+					^if(^hParams.type.int(0) != 0){
+						^hParams.type.int(0)
+					}{
+						$TransactionType:CHARGE
+					}
+				}
 				}[$.default(0)$.limit(1)])
 			}
 
@@ -244,17 +111,19 @@ $hResult[^hash::create[]]
 			INSERT INTO items (
 				name,
 				pid,
-				user_id
+				user_id,
+				is_auto_generated
 			) values (
 				'$hParams.name',
 				^hParams.pid.int(0),
-				$USERID
+				$USERID,
+				^hParams.isAutoGenerated.int(0)
 			)}
 
 		$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
 
 		$hResult.tValues[^table::create{iid	pid	alias_id	type
-$iLastInsert	^hParams.pid.int(0)		^hParams.type.int($dbo:TYPES.CHARGE)}]
+$iLastInsert	^hParams.pid.int(0)		^hParams.type.int($TransactionType:CHARGE)}]
 
 	^rebuildNestingDataLocal[
 		$.iid($hResult.tValues.iid)
@@ -269,59 +138,89 @@ $iLastInsert	^hParams.pid.int(0)		^hParams.type.int($dbo:TYPES.CHARGE)}]
 }
 $result[^hash::create[$hResult]]
 
+@deleteCategoriesIfEmpty[hParams][locals]
+$hParams[^hash::create[$hParams]]
+
+^if($hParams.tData && $hParams.tData is table){
+	^hParams.tData.menu{
+		^deleteCategoryIfEmpty[
+			$.iid(^hParams.tData.iid.int(0))
+		]
+	}
+}
+
+
+@deleteCategoryIfEmpty[hParams][locals]
+$hParams[^hash::create[$hParams]]
+
+$iCountOfEntriesWithSameCategory[^oSql.int{
+	SELECT COUNT(*)
+	FROM transactions t 
+	LEFT JOIN nesting_data nd ON nd.iid = t.iid
+	WHERE nd.pid = ^hParams.iid.int(0)
+		AND t.user_id = $USERID
+		AND nd.user_id = $USERID
+}]
+
+^if($iCountOfEntriesWithSameCategory == 0){
+	^dbo:deleteItem[$.iid(^hParams.iid.int(0))]
+}
+
+
 @deleteTransaction[hParams][locals]
 $hParams[^hash::create[$hParams]]
-^if(^hParams.isDeleteEmptyCategories.int(0)){
-
-# удаление опустошенной категории	
-# 	$tItemData[^oSql.int{
-# 		SELECT iid,alias_id FROM transactions WHERE tid = ^hParams.tid.int(0)
-# 	}]
-
-# 	^dbo:rebuildNestingDataLocal[
-# 		$.iid()
-# 	]
-}
 
 ^if(^hParams.isDeleteCheque.int(0)){
 
-	$iChequeTid(^oSql.int{SELECT ctid FROM transactions WHERE tid = ^hParams.tid.int(0)}[
+	$tCheck[^oSql.table{SELECT
+		t.ctid,
+		ct.iid
+		FROM transactions t
+		LEFT JOIN transactions ct ON ct.tid = t.ctid
+		WHERE t.tid = ^hParams.tid.int(0)
+		AND t.user_id = $USERID}[
 		$.limit(1)
-		$.default(0)
-		])
-	^if($iChequeTid != 0){
-		^oSql.void{
-		DELETE FROM transactions 
-		WHERE 
-			(ctid = $iChequeTid OR tid = $iChequeTid)
+	]]
+	^if($tCheck && ^tCheck.ctid.int(0)){
+
+		$tItemsToDelete[^oSql.table{
+			SELECT DISTINCT iid
+			FROM transactions 
+			WHERE 
+			(ctid = ^tCheck.ctid.int(0) OR tid = ^tCheck.ctid.int(0))
 			AND user_id = $USERID
-		}
+			}]
+
+		^dbo:_deleteTransactions[$.ctid(^tCheck.ctid.int(0))]
+		^dbo:deleteCategoriesIfEmpty[$.tData[^table::create[$tItemsToDelete]]]
 	}{
-		^oSql.void{
-		DELETE FROM transactions 
-		WHERE 
-			tid = ^hParams.tid.int(0)
-			AND user_id = $USERID
-		}
+		^dbo:_deleteTransactions[$.tid(^hParams.tid.int(0))]
+		^dbo:deleteCategoryIfEmpty[$.iid(^hParams.iid.int(0))]
 	}
-
-
 }{
-	^oSql.void{
-	DELETE FROM transactions 
-	WHERE 
-		tid = ^hParams.tid.int(0)
-		AND user_id = $USERID
-	}
+	^dbo:_deleteTransactions[$.tid(^hParams.tid.int(0))]
+	^dbo:deleteCategoryIfEmpty[$.iid(^hParams.iid.int(0))]
 }
 
-
+@_deleteTransactions[hParams]
+$hParams[^hash::create[$hParams]]
+^oSql.void{
+DELETE FROM transactions 
+WHERE 
+	(
+	^if(^hParams.ctid.int(0)){
+		ctid = ^hParams.ctid.int(0)
+		OR 
+	}
+	tid = ^hParams.tid.int(^hParams.ctid.int(0))
+	)
+	AND user_id = $USERID
+}
 
 
 @deleteItem[hParams]
 $hParams[^hash::create[$hParams]]
 ^if(^hParams.iid.int(0)){
-
 	^oSql.void{
 		DELETE FROM items 
 		WHERE iid = ^hParams.iid.int(0)
@@ -331,6 +230,38 @@ $hParams[^hash::create[$hParams]]
 	^rebuildNestingDataLocal[$.iid(^hParams.iid.int(0))]
 }
 
+@moveCategory[hParams][locals]
+$hParams[^hash::create[$hParams]]
+$isParentConflict(^oSql.int{
+	SELECT COUNT(*) FROM nesting_data
+	WHERE pid = ^hParams.iid.int(0)
+	AND iid = ^hParams.pid.int(0)
+	AND user_id = $USERID
+})
+
+^if($isParentConflict == 0){
+	$iPreviousPID(^oSql.int{
+		SELECT pid
+		FROM items
+		WHERE iid = ^hParams.iid.int(0)
+		AND user_id = $USERID
+		})
+
+	^oSql.void{
+		UPDATE items SET pid = ^hParams.pid.int(0)
+		WHERE iid = ^hParams.iid.int(0)
+		AND user_id = $USERID
+	}
+
+	^dbo:rebuildNestingDataLocal[
+		$.iid(^hParams.iid.int(0))
+		$.pid(^hParams.pid.int(0))
+	]
+
+	^dbo:deleteCategoryIfEmpty[
+		$.iid($iPreviousPID)
+	]
+}
 
 
 @createGroup[hParams]
@@ -396,112 +327,131 @@ $result[^hash::create[$hResult]]
 
 
 
+
 ^rem{ ************************* }
 ^rem{ *** createTransaction *** }
 ^rem{ ************************* }
 @createTransaction[hParams]
-$dtNow[^date::now[]]
 $hParams[^hash::create[$hParams]]
 $hResult[^hash::create[]]
-^if(^hParams.iid.int(0) != 0){
-
-		^if(!def $hParams.operday && def $hParams.tdate){
-			$hParams.operday[$hParams.tdate]
-		}
-		^if($hParams.doNotCreateOperday){
-			$hOperday[$.operday[$hParams.operday]]
-		}{
-			$hOperday[^createOperday[$.operday[$hParams.operday]]]
-		}
-
-
+^if(!def $hParams.operday && def $hParams.tdate){
+	$hParams.operday[$hParams.tdate]
+}
+^if($hParams.doNotCreateOperday){
+	$hOperday[$.operday[$hParams.operday]]
+}{
+	$hOperday[^createOperday[$.operday[$hParams.operday]]]
+}
+$tExistTransaction[]
+^if(^u:isEqualType(^hParams.type.int(0);$TransactionType:ACCOUNT)){
+	$tExistTransaction[^oSql.table{
+		SELECT tid, amount
+		FROM transactions
+		WHERE iid = ^hParams.iid.int(0)
+		AND user_id = $USERID
+		ORDER BY tdate DESC, dateadded DESC
+	}[$.limit(1)]]
+	^if(def $tExistTransaction){
 		^oSql.void{
-		INSERT INTO transactions (
-			operday,
-			account_id_from,
-			account_id_to,
-			iid,
-			alias_id,
-			tdate,
-			dateadded,
-			amount,
-			discount,
-			quantity,
-			user_id,
-			ctid,
-			is_displayed,
-			type)
-		VALUES (
-			$hOperday.operday,
-			^hParams.account_id_from.int(1),
-			^hParams.account_id_to.int(0),
-			^hParams.iid.int(0),
-			^hParams.alias_id.int(0),
-			"^u:getSQLStringDate[$hParams.tdate]",
-#			^if(def $hParams.tdate){
-#				'$hParams.tdate',
-#			}{
-#				'^dtNow.sql-string[]',
-#			}
-			^if(def $hParams.adate){
-				"^u:getSQLStringDate[$hParams.adate]",
+		UPDATE transactions 
+			SET 
+			operday = $hOperday.operday,
+			
+			tdate = "^u:getSQLStringDate[$hParams.tdate]",
+			dateadded = ^if(def $hParams.adate){
+				"^u:getSQLStringDate[$hParams.adate]"
 			}{
-				NOW(),
-			}
-			^math:abs(^hParams.amount.double(0)),
-			^hParams.discount.double(0),
-			^hParams.quantity.double(1.0),
-			$USERID,
-			^hParams.ctid.int(0),
-			^hParams.is_displayed.int(1),
+				NOW()
+			},
+			amount = ^calculateTransactionAmount(
+				^math:abs(^hParams.amount.double(0));
+				^tExistTransaction.amount.double(0);
+				^hParams.type.int(0))
+			WHERE tid = $tExistTransaction.tid
+			
+		}
+		$hResult.tValues[^table::create{tid	iid
+$tExistTransaction.tid	^hParams.iid.int(0)}]
 
-			^if( (^hParams.type.int(0) & $TYPES.CHARGE) == $TYPES.CHARGE ||
-			(^hParams.type.int(0) & $TYPES.INCOME) == $TYPES.INCOME ){
+		$result[^hash::create[$hResult]]
+	}
+}
+^if(!def $tExistTransaction){
+	^oSql.void{
+	INSERT INTO transactions (
+		operday,
+		iid,
+		alias_id,
+		tdate,
+		dateadded,
+		amount,
+		discount,
+		quantity,
+		user_id,
+		ctid,
+		is_displayed,
+		type)
+	VALUES (
+		$hOperday.operday,
+		^hParams.iid.int(0),
+		^hParams.alias_id.int(0),
+		"^u:getSQLStringDate[$hParams.tdate]",
+		^if(def $hParams.adate){
+			"^u:getSQLStringDate[$hParams.adate]",
+		}{
+			NOW(),
+		}
+		^math:abs(^hParams.amount.double(0)),
+		^hParams.discount.double(0),
+		^hParams.quantity.double(1.0),
+		$USERID,
+		^hParams.ctid.int(0),
+		^hParams.is_displayed.int(1),
+		^if(^u:isEqualType(^hParams.type.int(0);$TransactionType:ACCOUNT)){
+			^eval($TransactionType:ACCOUNT | $TransactionType:STATEMENT)
+		}{
+			^if(^hParams.type.int(0) != 0){
 				^hParams.type.int(0)
 			}{
-				^if(^hParams.amount.double(0) < 0){
-					^hParams.type.int(0) | $TYPES.CHARGE
-				}{
-					^hParams.type.int(0) | $TYPES.INCOME
-				}
+				^if(^hParams.amount.double(0) < 0;$TransactionType:CHARGE;$TransactionType:INCOME)
 			}
-		)}
-	
-			$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
-	
-		^if(def $hParams.gid){
-			$tGroupID[^table::create[nameless]{$hParams.gid}]
-			^tGroupID.menu{
-				^if(^tGroupID.0.int(0) != 0){
-					^oSql.void{
-						INSERT INTO transactions_in_groups (
-							tid,
-							gid
-						) values (
-							$iLastInsert,
-							^tGroupID.0.int(0)
-						)}
-				}
-			}
-	
 		}
-	
-# 		$hResult.tValues[^oSql.table{
-# 			SELECT
-# 				tid,
-# 				iid
-# 			FROM transactions
-# 			WHERE tid = $iLastInsert
-# 		}[$.limit(1)]]
+		
+	)}
 
-		$hResult.tValues[^table::create{tid	iid
+		$iLastInsert(^oSql.int{SELECT LAST_INSERT_ID()})
+
+	$hResult.tValues[^table::create{tid	iid
 $iLastInsert	^hParams.iid.int(0)}]
 
-}{
-	$hResult.isError(true)
+	^if(^hParams.iid.int(0) == 0){
+		$result[$.isError(true)]
+	}{
+		$result[^hash::create[$hResult]]
+	}
 }
-$result[^hash::create[$hResult]]
 
+@calculateTransactionAmount[dAmount;dLastStatementSum;iType][result]
+^if(^u:isEqualType($iType;$TransactionType:STATEMENT)){
+	$result($dAmount)
+}{
+	^if(^u:isEqualType($iType;$TransactionType:CHARGE)){
+		$result(^u:max($dLastStatementSum - $dAmount;0))
+	}{
+		$result($dLastStatementSum + $dAmount)
+	}
+}
+
+@calculateTransactionType[iType;dAmount][result]
+^if($iType != 0){
+	$result($iType)
+}{
+	^if($dAmount < 0){
+		$result($iType | $TransactionType:CHARGE)
+	}{
+		$result($iType | $TransactionType:INCOME)
+	}
+}
 
 @getGroupsForTransactions[hParams]
 $hParams[^hash::create[$hParams]]
@@ -548,16 +498,12 @@ SELECT
 	0 as ctid,
 	0 AS ciid,
 	0 AS type,
-# 	0 AS account_from_paytype,
-# 	0 AS account_to_paytype,
-# 	0 AS unit_name,
 	i.iid,
-# 	0 AS barcode,
 	0 AS extraname,
 	0 AS tiname,
 	i.pid,
 	sum(t.amount) AS sum,
-	sum(i.quantity_factor*t.quantity) AS quantity,
+	sum(t.quantity) AS quantity,
 	1 AS count_of_transactions,
 	1 AS has_children,
 	0 AS operday
@@ -571,7 +517,7 @@ WHERE
 	^if(^hParams.pid.int(0)){
 		AND nd.pid = ^hParams.pid.int(0)
 	}{
-		AND i.type & ^hParams.type.int(0) = ^hParams.type.int(0)
+		AND i.type = ^hParams.type.int(0)
 	}
 }
 
@@ -606,7 +552,7 @@ SELECT
 	0 AS tiname,
 	i.pid,
 	SUM(t.amount) AS sum,
-	SUM(i.quantity_factor*t.quantity) AS quantity,
+	SUM(t.quantity) AS quantity,
 	COUNT(*) AS count_of_transactions,
 	1 AS has_children,
 	t2.operday AS operday
@@ -637,7 +583,7 @@ SELECT
 	ti.name AS tiname,
 	i.pid,
 	sum(t2.amount) AS sum,
-	sum(i.quantity_factor*t2.quantity) AS quantity,
+	sum(t2.quantity) AS quantity,
 	COUNT(*) count_of_transactions,
 	(t2.iid <> i.iid OR (t2.iid = i.iid AND COUNT(DISTINCT t2.iid) > 1)) AS has_children,
 	t2.operday
@@ -665,8 +611,9 @@ LEFT JOIN items last_parent ON last_parent.iid = last_parent_nd.iid
 WHERE 
 t2.user_id = $USERID AND
 i.user_id = $USERID AND
-(last_parent_nd.level = transaction_for_last_parent_nd.level-1 
-OR transaction_for_last_parent_nd.level = 0)
+(transaction_for_last_parent_nd.level = 0
+OR last_parent_nd.level = transaction_for_last_parent_nd.level-1
+)
 AND
 last_parent_nd.pid = last_parent_nd.iid
 
@@ -695,7 +642,7 @@ last_parent_nd.pid = last_parent_nd.iid
 		)
 	}{
 
-	AND ndi.type & ^hParams.type.int(0) = ^hParams.type.int(0)
+	AND ndi.type = ^hParams.type.int(0)
 	}
 }
 
@@ -734,7 +681,7 @@ SELECT
 	0 AS tiname,
 	i.pid,
 	SUM(t.amount) AS sum,
-	SUM(i.quantity_factor*t.quantity) AS quantity,
+	SUM(t.quantity) AS quantity,
 	COUNT(*) AS count_of_transactions,
 	1 AS has_children,
 	0 AS operday
@@ -751,7 +698,7 @@ LEFT JOIN nesting_data nd ON nd.iid = t.iid
 WHERE
 	ct.iid = ^hParams.ciid.int(0)
 	AND nd.iid = nd.pid
-	AND nd.type & ^hParams.type.int($dbo:TYPES.CHARGE) = ^hParams.type.int($dbo:TYPES.CHARGE)
+	AND nd.type = ^hParams.type.int($TransactionType:CHARGE)
 	AND t.user_id = $USERID
 ^if(^hParams.startOperday.int(0) != 0 && ^hParams.endOperday.int(0) != 0){
 	^if(^hParams.startOperday.int(0) == ^hParams.endOperday.int(0)){
@@ -784,7 +731,7 @@ SELECT
 	i.pid,
 	sum(t2.amount) AS sum,
 
-	sum(i.quantity_factor*t2.quantity) AS quantity,
+	sum(t2.quantity) AS quantity,
 	COUNT(*) count_of_transactions,
 	(t2.iid <> i.iid OR (t2.iid = i.iid AND COUNT(DISTINCT t2.iid) > 1)) AS has_children,
 
@@ -808,7 +755,7 @@ LEFT JOIN items last_parent ON last_parent.iid = last_parent_nd.iid
 #	 AND last_parent_nd.pid <> nd.pid
 	}
 WHERE
-transaction_for_last_parent_nd.type & ^hParams.type.int($dbo:TYPES.CHARGE) = ^hParams.type.int($dbo:TYPES.CHARGE)
+transaction_for_last_parent_nd.type = ^hParams.type.int($TransactionType:CHARGE)
 AND t2.user_id = $USERID
  AND i.user_id = $USERID AND
 (last_parent_nd.level = transaction_for_last_parent_nd.level-1 
@@ -869,15 +816,8 @@ SELECT
 	t2.ctid,
 	cheque.iid AS ciid,
 	t2.type,
-# 	af.paytype AS account_from_paytype,
-# 	at.paytype AS account_to_paytype,
 	
-
-	
-#	IFNULL(u.name,ub.name) as unit_name,
-# 	u.name as unit_name,
 	i.iid,
-# 	IFNULL(ai.barcode,i.barcode) AS barcode,
 	ai.name AS extraname,
 	ti.name AS tiname,
 	i.pid,
@@ -885,7 +825,7 @@ SELECT
 	sum(t2.amount) AS sum,
 #	sum(t2.quantity) AS quantity,
 #	sum(IFNULL(u.factor,1)*t2.quantity) AS quantity,
-	sum(i.quantity_factor*t2.quantity) AS quantity,
+	sum(t2.quantity) AS quantity,
 	COUNT(*) count_of_transactions,
 #	g.name AS group_name,
 #	g.gid,
@@ -899,12 +839,8 @@ LEFT JOIN nesting_data ndp ON i.iid=ndp.iid
 LEFT JOIN nesting_data nd ON nd.pid=ndp.iid
 LEFT JOIN transactions t2 ON t2.iid = nd.iid
 LEFT JOIN transactions cheque ON t2.ctid = cheque.tid
-# LEFT JOIN units u ON u.unit_id = i.unit_id
-# LEFT JOIN units ub ON ub.unit_id = u.base_unit_id
 LEFT JOIN items ai ON ai.iid = t2.alias_id
 # LEFT JOIN items tti ON tti.iid = t2.iid
-# LEFT JOIN accounts af ON af.account_id = t2.account_id_from
-# LEFT JOIN accounts at ON at.account_id = t2.account_id_to
 LEFT JOIN transactions ct ON ct.tid = t2.ctid
 LEFT JOIN items ti ON ti.iid = ct.iid
 
@@ -942,11 +878,10 @@ WHERE
 
 		AND i.pid = (SELECT iid FROM items 
 			WHERE 
-			user_id = $USERID AND
-			type & ^hParams.type.int(0) = ^hParams.type.int(0))
+			user_id = $USERID AND type = ^hParams.type.int(0))
 # 		AND parent_item.type & ^hParams.type.int(0) = ^hParams.type.int(0)
 	}
-# 	^if($hParams.type & $TYPES.CHARGE == $TYPES.CHARGE){
+# 	^if($hParams.type & $TransactionType:CHARGE == $TransactionType:CHARGE){
 # 		AND (i.iid = 2058 OR i.pid = 2058)
 # 	}{
 # 		AND (i.iid = 2057 OR i.pid = 2057)
@@ -979,6 +914,28 @@ operday ASC,
 i.name
 }]
 
+@searchEntries[hParams][tEntries]
+$hParams[^hash::create[$hParams]]
+$result[^oSql.table{
+SELECT
+	parent.name,
+	SUM(t.amount) AS amount,
+	SUM(t.quantity) AS quantity,
+	t.operday,
+	t.iid AS transaction_iid,
+	parent.iid AS found_by_iid
+FROM items parent
+LEFT JOIN nesting_data nd ON nd.pid = parent.iid 
+LEFT JOIN transactions t ON t.iid = nd.iid
+WHERE
+	parent.user_id = $USERID
+	AND t.user_id = $USERID
+	AND parent.name = '$hParams.name'
+	AND t.is_displayed = 1
+GROUP BY found_by_iid, operday
+ORDER BY operday DESC
+}[$.limit(^hParams.limit.int(10))]]
+
 @getParentItems[hParams]
 $hParams[^hash::create[$hParams]]
 $result[^oSql.table{
@@ -997,15 +954,12 @@ ORDER BY np.level
 $result(^oSql.int{
 	SELECT operday 
 	FROM operdays 
-# 	WHERE user_id = $USERID AND
 	ORDER BY operday DESC
 }[$.limit(1)$.default(0)])
 
 
 @getCurrentOperday[]
 $result(^u:getOperdayByDate[^date::now[]])
-
-@getOperdays[]
 
 
 @getTotalOut[hParams]
@@ -1049,30 +1003,47 @@ $hParams[^hash::create[$hParams]]
 	})
 }
 
-@getUsers[]
 
-$tUsers[^oSql.table{SELECT name, fullname FROM users}]
-^tUsers.menu{$tUsers.name, $tUsers.fullname}[<br/>]
-
-@getAccounts[]
-$intMaxOperday(^oSql.int{
-	SELECT max(operday) from operdays
-}[$.default(1)])
-$intMaxOperday
-$tAccountState[^oSql.table{
-	SELECT ae.begin_sum,
-	ae.end_sum,
-	a.name
-	FROM accounts_entries AS ae
-	LEFT JOIN accounts AS a ON a.account_id = ae.account_id
-	WHERE ae.operday = $intMaxOperday
+@getAccounts[hParams][tEntries]
+$hParams[^hash::create[$hParams]]
+$result[^oSql.table{
+SELECT
+	i.name AS name,
+	t.amount AS sum
+FROM transactions t
+LEFT JOIN items i ON i.iid = t.iid
+LEFT JOIN items parent_item ON i.pid = parent_item.iid
+WHERE 
+t.user_id = $USERID AND
+parent_item.type = $TransactionType:ACCOUNT
+AND t.amount <> 0
+GROUP BY i.name
+ORDER BY i.name
 }]
-^tAccountState.menu{$tAccountState.name, $tAccountState.end_sum}[<br/>]
 
-
-
-
-
+# @getAccounts[hParams][tEntries]
+# $hParams[^hash::create[$hParams]]
+# $result[^oSql.table{
+# SELECT
+# 	i.name AS name,
+# 	t.amount AS sum
+# FROM transactions t
+# LEFT JOIN items i ON i.iid = t.iid
+# LEFT JOIN (
+# 	SELECT MAX(t2.tid) tid 
+# 	FROM transactions t2
+# 	LEFT JOIN items i2 ON i2.iid = t2.iid
+# 	LEFT JOIN items parent_item ON i2.pid = parent_item.iid
+# 	WHERE
+# 		t2.user_id = $USERID AND
+# 		parent_item.type = $TransactionType:ACCOUNT
+# 	GROUP BY t2.iid
+# ) last ON last.tid = t.tid
+# WHERE last.tid IS NOT NULL
+# AND t.amount <> 0
+# ORDER BY
+# 	i.name
+# }]
 
 @rebuildNestingDataLocal[hParams][locals]
 $hParams[^hash::create[$hParams]]

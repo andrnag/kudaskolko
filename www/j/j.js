@@ -1,6 +1,45 @@
 var transactionValueComplete = '';
 
 $(function() {
+
+		function makeTextareaData(val){
+			var result = new Object;
+			var oldCaretPos = $( "#transactions" ).prop("selectionStart");
+			var oldValue = $( "#transactions" ).val();
+			var startLinePos = oldValue.lastIndexOf("\n", oldCaretPos - 1);
+			var beforeCurrentLinePos =  startLinePos == -1 ? 0 : startLinePos + 1;
+			result.before = oldValue.substring(0, beforeCurrentLinePos)
+			result.after = oldValue.substring(oldCaretPos, oldValue.length);
+			result.newCaretPos = beforeCurrentLinePos + val.length
+			result.val = val;
+			return result;
+		}
+
+		function setCursorAt(position){
+			document.getElementById("transactions").setSelectionRange(position, position);
+		}
+
+		function markAsNotListed(id){
+			$.ajax({
+					type: "GET",
+					url: "/?action=hidefromlist&ajax=1",
+					datatype: "html",
+					cache: false,
+					data: {iid: id}
+				}).done(function( html ) {
+					
+					// $("#IDAjaxPreview .dataContainer").html(html);
+					// $("#IDAjaxPreview").removeClass("hidden");
+					// controlsPreview.attr("disabled",true);
+					// hasAjaxPreviewFormatError = $("#IDAjaxPreview .dataContainer .grid").hasClass("hasError");
+					// if(hasAjaxPreviewFormatError){
+					// 	controlsSubmit.attr("disabled",true);
+					// 	$("#IDAjaxPreview").effect("shake", { times:2, distance:10 }, 100);
+					// }
+				}).fail(function(jqXHR, textStatus) {
+				});
+		}
+
 		function split( val ) {
 			return val.trim().split( /\n/ );
 		}
@@ -61,55 +100,97 @@ $(function() {
 					// preve event, uint value inserted on focus
 					return false;
 				},
+				close: function( event, ui) {
+					// if(ui.item.label != ''){
+						// $( this ).autocomplete( "close");
+						// $(this).autocomplete( "search", "Шоколад" );
+					// }
+					return false;
+				},
 
 				select: function( event, ui ) {
-					var caretPos = $( "#transactions" ).prop("selectionStart");
-					var oldValue = $( "#transactions" ).val();
-					var startLinePos = oldValue.lastIndexOf("\n", caretPos - 1);
-					var beforeCurrentLinePos =  startLinePos == -1 ? 0 : startLinePos + 1;
-					var newValue = ui.item.value + " ";
-					this.value = 
-						// то, что было до новой строки
-						oldValue.substring(0, beforeCurrentLinePos)
-						// результат автоподстановки
-						+ newValue
-						// то, что было после курсора
-						+ oldValue.substring(caretPos, oldValue.length);
-					// почему-то не работает $( "#transactions" ).setSelectionRange(m,n)
-					var input = document.getElementById("transactions");
-					var newCaretPos = beforeCurrentLinePos + newValue.length
-					input.setSelectionRange(newCaretPos, newCaretPos);
+					// if(ui.item.label != ''){
+					// 	return false;
+					// }
+					var result = makeTextareaData(ui.item.value + " " + (ui.item.with_price == 1 ? "\n" : ""));
+					this.value = result.before + result.val + result.after;
+					setCursorAt(result.newCaretPos);
+					if (ui.item.label && ui.item.label != 'undefined' && ui.item.value != ui.item.label) {
+						ajaxPreview();
+					} else if (ui.item.with_price && ui.item.with_price == 1) {
+						ajaxPreview();
+					}
 					return false;
 				}
-			});
+		})
+		if($( "#transactions" ) && $( "#transactions" ).data( "ui-autocomplete" )) {
+			$( "#transactions" ).data( "ui-autocomplete" )._renderItem = function( ul, item ) {
+				var t = extractCurrent( $( "#transactions" ).val() );
+				var splitted = t.split( /\s+/ );
+				var result = "";
+				for (var i = splitted.length - 1; i >= 0; i--) {
+						result += "|";
+					result += $.ui.autocomplete.escapeRegex(splitted[i]);
+				};
+
+				var matcher = new RegExp("(\\s+|^|@|\\$|\\(|\\-)(" + $.ui.autocomplete.escapeRegex(t) + result+")", "ig" );
+						
+				if(item.iid && item.iid != 'undefined'){
+					var $anchor = $( "<div ><u>Все записи</u></div>" )
+						.addClass("search-link")
+						// .attr("href", '/?iid=' + item.iid )
+						.hover(function(e){
+							$(this).parent().addClass("hover-search");
+						},function(e){
+							$(this).parent().removeClass("hover-search");
+						}).click(function(e){
+							var result = makeTextareaData("");
+							if(!result.before && !result.after){
+								$("#transactions").val('');
+								$.cookie("draft", null);
+							}
+							window.location.href = '/?p=' + item.iid;
+								return false;
+					 });
+					var $anchor2 = $( "<div ><u>1</u></div>" )
+						.attr("href", '/?iid=' + item.iid )
+						.hover(function(e){
+						})
+						.click(function(e){
+						return false;
+					 });
+
+				 	var resultValue = item.value;
+					if (item.label && item.label != 'undefined') {
+						resultValue = item.label;
+					} 
+					resultValue = resultValue.replace(matcher, "$1<i>$2</i>");
+					return $( "<li>" )
+					.append( $( "<a>" )
+						.append($anchor)
+						.append("<div class='value'>" + resultValue + "</div>")
+						// .append($anchor2)
+						 )
+					.appendTo( ul );
+				} else {
+				 	var resultValue = item.value;
+					if (item.label && item.label != 'undefined') {
+						resultValue = item.label;
+					} 
+					resultValue = resultValue.replace(matcher, "$1<i>$2</i>");
+
+					return $( "<li>" )
+					.append( "<a><div class='value'>" + resultValue + "</div></a>" )
+					.appendTo( ul );
+				}
+
+    		};
+    	}
 	});
 
 
 $(function() {
-		// var availableTags = [
-		// 	"ActionScript",
-		// 	"AppleScript",
-		// 	"Asp",
-		// 	"BASIC",
-		// 	"C",
-		// 	"C++",
-		// 	"Clojure",
-		// 	"COBOL",
-		// 	"ColdFusion",
-		// 	"Erlang",
-		// 	"Fortran",
-		// 	"Groovy",
-		// 	"Haskell",
-		// 	"Java",
-		// 	"JavaScript",
-		// 	"Lisp",
-		// 	"Perl",
-		// 	"PHP",
-		// 	"Python",
-		// 	"Ruby",
-		// 	"Scala",
-		// 	"Scheme"
-		// ];
+
 		function split( val ) {
 			return val.split( /,\s*/ );
 		}
@@ -131,31 +212,9 @@ $(function() {
 				minLength: 2,
 				autoFocus: false,
 				position: { my : "left top", at: "left bottom" },
-				// source: function( request, response ) {
-				// 	// delegate back to autocomplete, but extract the last term
-				// 	response( $.ui.autocomplete.filter(
-				// 		availableTags, extractLast( request.term ) ) );
-				// },
-
-				// source: function( request, response ) {
-				// 	var term = request.term;
-				// 	// if ( term in cache ) {
-				// 	// 	response( cache[ term ] );
-				// 	// 	return;
-				// 	// }
-
-				// 	lastXhr = $.getJSON( "/?action=json", request, function( data, status, xhr ) {
-				// 		cache[ term ] = data;
-				// 		if ( xhr === lastXhr ) {
-				// 			// response( data );
-				// 	response( $.ui.autocomplete.filter(
-				// 		data, extractLast( request.term ) ) );
-				// 		}
-				// 	});
-				// },
 
 				source: function( request, response ) {
-					$.getJSON( "/?action=json", {
+					$.getJSON( "/?action=json&move=true", {
 						term: extractLast( request.term )
 					}, response );
 
@@ -179,9 +238,20 @@ $(function() {
 					// add placeholder to get the comma-and-space at the end
 					// terms.push( "" );
 					this.value = terms.join( ", " );
+					enableDisableControlAll($('#IDNewCategory'),$("#actionMove input[type='submit']"),'');
+					enableDisableControlAll($('#IDNewCategory'),$("#actionMove input[type='submit']"), $('#IDNewCategoryName').attr('oldValue'));
+
 					return false;
 				}
 			});
+
+			if($( "#IDNewCategory" ) && $( "#IDNewCategory" ).data( "ui-autocomplete" )) {
+				$( "#IDNewCategory" ).data( "ui-autocomplete" )._renderItem = function( ul, item ) {
+					return $( "<li>" )
+						.append( $( "<a>" ).text( item.value ) )
+						.appendTo( ul );
+				}
+			}
 	});
 
 function setRowsHeight(textarea, rows){
@@ -201,13 +271,13 @@ function setRows(textarea, isEmpty, isFocus){
 		setRowsHeight(textarea, 1);
 	} else {
 		var newLineCount = textarea.val().split("\n").length;
-		if(newLineCount <= 3) {
+		if(newLineCount <= 4) {
 			setRowsHeight(textarea, 5);
 		}
-		else if(newLineCount > 3 && newLineCount <= 7) {
+		else if(newLineCount > 4 && newLineCount <= 9) {
 			setRowsHeight(textarea, 10);
 		}
-		else if(newLineCount > 7) {
+		else if(newLineCount > 9) {
 			setRowsHeight(textarea, 15);
 			textarea.css('overflow','auto');
 		}
@@ -267,9 +337,10 @@ function enableDisableControl2(control,isDisabled) {
 }
 
 function enableDisableControl(input,control,originValue) {
-	var inputVal = input.val();
+	var inputVal = ((input.val() && input.val() != 'undefined') ? input.val().trim() : '');
+	var originVal = ((originVal && originVal != 'undefined') ? originVal.trim() : '');
 	var isEmpty = inputVal == '';
-	var isNotModified = inputVal == originValue;
+	var isNotModified = inputVal == originVal;
 	if(isEmpty || isNotModified)
 		control.attr("disabled",true);
 	else
@@ -279,6 +350,9 @@ function enableDisableControl(input,control,originValue) {
 function enableDisableControlAll(input,control,originValue) {
 	enableDisableControl(input,control,originValue);
 	input.keyup(function(){
+		enableDisableControl(input,control,originValue);
+	});
+	input.change(function(){
 		enableDisableControl(input,control,originValue);
 	});
 }
@@ -292,7 +366,7 @@ var saveDraftTimer;
 function ajaxPreview(text){
 	clearTimeout(previewTimer);
 	var value;
-	if(text == null)
+	if (text == null)
 		value = transactionsID.val().trim();
 	else
 		value = text.trim();
@@ -302,7 +376,11 @@ function ajaxPreview(text){
 		$("#IDAjaxPreview .dataContainer").html("");
 		return;
 	}
-	if(value == transactionsValue && !hasAjaxPreviewHTTPError){
+	var re = new RegExp(".?\\.$", "ig" );
+	var isSingleLine = (value.split("\n").length == 1) 
+	&& re.test($.ui.autocomplete.escapeRegex(value))
+	;
+	if (value == transactionsValue && !hasAjaxPreviewHTTPError){
 		controlsPreview.attr("disabled",true);
 		if(hasAjaxPreviewFormatError)
 			controlsSubmit.attr("disabled",true);
@@ -310,9 +388,13 @@ function ajaxPreview(text){
 	}
 	transactionsValue = value;
 	$.cookie("draft", value, { expires : 90 });
+	var ajaxUrl = "/?action=out&preview=1&ajax=1&anonymous=1";
+	if (isSingleLine) {
+		ajaxUrl = "/?action=searchtransactions"
+	}
 	$.ajax({
 		type: "POST",
-		url: "/?action=out&preview=1&ajax=1&anonymous=1",
+		url: ajaxUrl,
 		datatype: "html",
 		cache: true,
 		data: {transactions: value}
@@ -321,20 +403,25 @@ function ajaxPreview(text){
 		// 	$("#IDAjaxPreview .dataContainer").html("..."); 
 		// }
 	}).done(function( html ) {
+		if (isSingleLine) {
+			controlsSubmit.attr("disabled",true);
+			$.cookie("draft", null);
+		}
 		hasAjaxPreviewHTTPError = false;
 		$("#IDAjaxPreview .dataContainer").html(html);
 		$("#IDAjaxPreview").removeClass("hidden");
 		controlsPreview.attr("disabled",true);
 		hasAjaxPreviewFormatError = $("#IDAjaxPreview .dataContainer .grid").hasClass("hasError");
-		if(hasAjaxPreviewFormatError){
-			controlsSubmit.attr("disabled",true);
+		
+		controlsSubmit.attr("disabled", hasAjaxPreviewFormatError);
+		if (hasAjaxPreviewFormatError){
 			$("#IDAjaxPreview").effect("shake", { times:2, distance:10 }, 100);
 		}
 	}).fail(function(jqXHR, textStatus) {
 		hasAjaxPreviewHTTPError = true;
 		$("#IDAjaxPreview .dataContainer").html("Ошибка подключения к серверу, попробуйте повторить ("+textStatus+")");
 		$("#IDAjaxPreview").removeClass("hidden");
-		// controlsPreview.attr("disabled",false);
+		controlsPreview.attr("disabled",false);
 	});
 
 }
@@ -346,7 +433,7 @@ var controlsPreview;
 
 
 $(document).ready(function(){
-	
+
 	transactionsID = $("#transactions");
 	taContainerID = $("#ta-container");
 	controlsPreview = $("#controls .preview");
@@ -520,6 +607,7 @@ $(function() {
 	// });
 
 	enableDisableControlAll($('#IDNewCategory'),$("#actionMove input[type='submit']"),'');
+	enableDisableControlAll($('#IDNewCategory'),$("#actionMove input[type='submit']"), $('#IDNewCategoryName').attr('oldValue'));
 
 	enableDisableControlAll($('#IDNewCategoryName'),
 		$("#actionRename input[type='submit']"),

@@ -1,11 +1,6 @@
 @CLASS
 transactionlist
 
-@USE
-utils.p
-dbo.p
-common/dtf.p
-
 @auto[]
 $data[^hash::create[]]
 
@@ -17,28 +12,21 @@ $USERID(^hParams.USERID.int(0))
 <ul class="breadscrumbs">
 $tParents[^dbo:getParentItems[$.iid[^form:p.int(0)]]]
 ^if(!$tParents && (^form:p.int(0) || ^form:ciid.int(0))){
-# && (^form:type.int(0) && !^form:pid.int(0))){
 <li><a href="^makeQueryString[
 				$.groupid[$form:groupid]
 				$.operday[$form:operday]
 			]">Расходы и доходы</a></li>
 }
 ^tParents.menu{
-^if(^tParents.line[] == ^tParents.count[]){
-	
-#<h2>$tParents.name</h2>
-}{
-
-	<li><a href="^makeQueryString[
-				$.groupid[$form:groupid]
-				$.operday[$form:operday]
-				^if($tParents.level != 0){
-					$.p[$tParents.iid]
-# 					$.type[$form:type]
-				}
-			]">$tParents.name</a></li>
-#^if(^tParents.line[] < (^tParents.count[]-1)){→}
-}
+	^if(^tParents.line[] != ^tParents.count[]){
+		<li><a href="^makeQueryString[
+					$.groupid[$form:groupid]
+					$.operday[$form:operday]
+					^if($tParents.level != 0){
+						$.p[$tParents.iid]
+					}
+				]">$tParents.name</a></li>
+	}
 }
 </ul>
 
@@ -55,24 +43,18 @@ $iType(^form:type.int(0))
 }{
 	$hPage.sTitle[Расходы и доходы ^oCalendar.printDateRange[]]
 }
-# ^if(^form:p.int(0) == 0 && ^form:type.int(0) == 0){
-# 	$hPage.sTitle[Расходы и доходы ^oCalendar.printDateRange[]]
-# # ^oCalendar.printDateRange[]]
-# }
 
 <div class="transactions">
-# ^if(^form:type.int($dbo:TYPES.CHARGE) == $dbo:TYPES.CHARGE){
-^if($iType == 0 || $iType == $dbo:TYPES.CHARGE){
+^if($iType == 0 || $iType == $TransactionType:CHARGE){
 <div id="charges">^printTransactionByType[
-	$.type[$dbo:TYPES.CHARGE]
+	$.type[$TransactionType:CHARGE]
 	$.title[Расходы]
 	$.title2[расходов]
 ]</div>
 }
-# ^if(^form:type.int($dbo:TYPES.INCOME) == $dbo:TYPES.INCOME){
-^if(($iType == 0 && !^form:ctid.int(0)) || $iType == $dbo:TYPES.INCOME){
+^if(($iType == 0 && !^form:ctid.int(0)) || $iType == $TransactionType:INCOME){
 <div id="incomes">^printTransactionByType[
-	$.type[$dbo:TYPES.INCOME]
+	$.type[$TransactionType:INCOME]
 	$.title[Доходы]
 	$.title2[доходов]
 ]</div>
@@ -106,7 +88,7 @@ $entryName[$tEntries.name]
  	^if(^form:ciid.int(^form:p.int(0))){
 		iid = ^form:ciid.int(^form:p.int(0))
 	}{
-		type & $hParams.type = $hParams.type
+		type = $hParams.type
 	}
 	}[	$.limit(1)$.default[default]]]
 }
@@ -139,7 +121,7 @@ $hTransactions.0.date[^oCalendar.printDateRange[]]
 	}
 
 	$hTransactions.0.name[$entryName]
-	$hTransactions.0.value[^u:formatValue($h.iSum)]
+	$hTransactions.0.value[^u:formatValueByType($h.iSum;$hParams.type)]
 # 	^if($tEntries.has_children == 1){
 		$hTransactions.0.expandLink[^makeQueryString[
 					$.groupid[$form:groupid]
@@ -164,7 +146,7 @@ $hTransactions.0.date[^oCalendar.printDateRange[]]
 	$hTransactions.0.name[<span>@</span>$entryName]
 # 	$hTransactions.0.date[^u:getDateRange[^u:stringToDate[$tEntries.operday]]]
 # 	$hTransactions.0.date[^u:formatOperday[$tEntries.operday]]
-	$hTransactions.0.value[^u:formatValue($tEntries.sum)]
+	$hTransactions.0.value[^u:formatValueByType($tEntries.sum;$hParams.type)]
 	$h.iOffset(1)
 	^tEntries.offset(1)
 
@@ -203,14 +185,14 @@ $h.iTotalSum(^dbo:getTotalOut[
 			$hCurrent.name[$tEntries.extraname]
 		}
 
-		^if(def $tEntries.tiname && ($tEntries.type & $dbo:TYPES.CHEQUE) != $dbo:TYPES.CHEQUE){
+		^if(def $tEntries.tiname && ($tEntries.type & $TransactionType:CHEQUE) != $TransactionType:CHEQUE){
 			$hCurrent.tiname[$tEntries.tiname]
 			$hCurrent.ctid[$tEntries.ctid]
 			$hCurrent.ciid[$tEntries.ciid]
 		}
 	}
 
-$hCurrent.value[^u:formatValue($tEntries.sum)]
+$hCurrent.value[^u:formatValueByType($tEntries.sum;$hParams.type)]
 $hCurrent.percent[^u:formatValue(100*$tEntries.sum/$h.iTotalSum)]
 
 	^if($tEntries.has_children == 0 &&
@@ -240,7 +222,7 @@ $hTransactions.0.no_entries[nodata]
 	$hCurrent.isRest(true)
 	$hCurrent.name[Прочее в категории $hTransactions.0.name]
 	$hCurrent.quantity[$h.dRestQuantity]
-	$hCurrent.value[^u:formatValue($h.iSum)]
+	$hCurrent.value[^u:formatValueByType($h.iSum;$hParams.type)]
 	$hCurrent.percent[^u:formatValue(100*$h.iSum/$h.iTotalSum)]
 
 }
@@ -411,25 +393,8 @@ $lastOperday[]
 			<td class="actions">^if(!def $v.no_entries && !$v.isRest){^actions[$v.tEntries; ]}</td>
 		</tr>
 	}
-
-
 }
-
-
-
 </table>
-
-@getClassByType[iType]
-^if(($iType & $dbo:TYPES.INCOME) == $dbo:TYPES.INCOME){
-	$result[class="income"]
-}{
-^if(($iType & $dbo:TYPES.TRANSFER) == $dbo:TYPES.TRANSFER){
-	$result[class="transfer"]
-}{
-	$result[]
-}
-
-}
 
 
 @makeQueryString[hUrlParts][sResult;hUrlParts;k;v]
@@ -440,8 +405,6 @@ $sResult[^hUrlParts.foreach[k;v]{^if(def $v){$k=$v}{^if($k eq operday){$k=$oCale
 }{
 	$result[]	
 }
-
-
 
 @actions[tEntries;sValue;sClass][sUrl]
 $sUrl[^makeQueryString[
@@ -462,54 +425,5 @@ $sUrl[^makeQueryString[
 <a href="$sUrl" class="$sClass">$sValue</a>
 
 
-
-
-@getTransferDescription[]
-
-$hDescription[
-
-	$.[$dbo:TYPES.CHARGE][
-		$.0[
-			$.0[Передача денег в кошелек X]
-			$.1[Зачисление денег на карту]	
-		]
-		$.1[
-			$.0[Снятие наличных]
-			$.1[Перевод на карту (ушло)]	
-		]
-	]
-	$.[$dbo:TYPES.CHARGE][
-		$.0[
-			$.0[Получение денег из кошелька Y]
-			$.1[Пополнение карты наличными]	
-		]
-		$.1[
-			$.0[Снятие наличных (пришло!)]
-			$.1[Перевод с карты (пришло!)]	
-		]
-	]
-]
-
-^rem{
-	0 списание
-	1 начисление
-	0 нал
-	1 карта
-	
-	
-	000 списание нал нал 
-	001 списание нал на карту Зачисление наличных на карту (минус)
-	010 списание карта на нал Снятие наличных (-)
-	011 списание карта на карту Перевод на карту 2 (с карты 1)
-	100 пополнение нал на нал
-	101 нал на карту Пополнение наличными
-	110 карта на нал Пополнение наличных (+)
-	111 карта на карту Перевод с карты 1 (на карту 2)
-	
-	
-	0 0 - Передача наличных
-	1 0 - снятие наличных
-	0 1 пополнение карты
-}
 
 

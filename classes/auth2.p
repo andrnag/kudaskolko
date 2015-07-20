@@ -4,7 +4,6 @@ auth2
 @USE
 common/Lib.p
 common/auth.p
-dbo.p
 
 @BASE
 auth

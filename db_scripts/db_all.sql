@@ -14,26 +14,6 @@
 CREATE DATABASE IF NOT EXISTS `kudaskolko` /*!40100 DEFAULT CHARACTER SET cp1251 */;
 USE `kudaskolko`;
 
-
-CREATE TABLE IF NOT EXISTS `accounts` (
-  `account_id` smallint(5) unsigned NOT NULL auto_increment,
-  `user_id` tinyint(3) unsigned NOT NULL default '0',
-  `name` varchar(50) default NULL,
-  `paytype` tinyint(3) unsigned default NULL,
-  `is_visible` tinyint(3) unsigned NOT NULL default '1',
-  PRIMARY KEY  (`account_id`),
-  KEY `Index 2` (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-CREATE TABLE IF NOT EXISTS `accounts_entries` (
-  `account_id` smallint(6) NOT NULL,
-  `operday` int(10) NOT NULL,
-  `begin_sum` double default NULL,
-  `end_sum` double default NULL,
-  KEY `Index 1` (`account_id`),
-  KEY `Index 2` (`operday`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
 CREATE TABLE IF NOT EXISTS `acl` (
   `object_id` int(10) unsigned NOT NULL default '0',
   `auser_id` int(10) unsigned NOT NULL default '0',
@@ -105,50 +85,29 @@ CREATE TABLE IF NOT EXISTS `groups` (
   PRIMARY KEY  (`gid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
-CREATE TABLE IF NOT EXISTS `importdata` (
-  `id` int(10) unsigned NOT NULL auto_increment,
-  `ck_number` int(10) unsigned default NULL,
-  `cash_code` int(10) unsigned default NULL,
-  `ck_amount` double default NULL,
-  `goodsname` varchar(256) default NULL,
-  `quantity` double unsigned default NULL,
-  `unitname` varchar(50) default NULL,
-  `amount` double unsigned default NULL,
-  `discount` double unsigned default NULL,
-  `date` datetime default NULL,
-  `barcode` varchar(20) default NULL,
-  `operday` int(10) unsigned default NULL,
-  `taken` tinyint(3) unsigned NOT NULL,
-  PRIMARY KEY  (`id`),
-  KEY `Index 2` (`operday`),
-  KEY `Index 3` (`taken`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
 CREATE TABLE IF NOT EXISTS `items` (
   `iid` int(10) unsigned NOT NULL auto_increment,
   `pid` int(10) unsigned NOT NULL,
   `name` varchar(255) default NULL,
   `level` smallint(6) NOT NULL,
-  `unit_id` smallint(5) unsigned default NULL,
-  `quantity_factor` double unsigned NOT NULL default '1',
-  `barcode` varchar(20) default NULL,
-  `description` varchar(255) default NULL,
   `type` tinyint(3) unsigned default NULL,
   `alias_id` int(10) unsigned default NULL,
   `user_id` smallint(5) unsigned NOT NULL,
+  `is_auto_generated` tinyint(3) unsigned NOT NULL default '0',
   PRIMARY KEY  (`iid`),
-  UNIQUE KEY `Index 5` (`barcode`,`name`),
-  KEY `Index 2` (`pid`),
-  KEY `Index 3` (`name`),
-  KEY `Index 4` (`level`),
-  KEY `user_id` (`user_id`)
+  KEY `pid` (`pid`),
+  KEY `name` (`name`),
+  KEY `level` (`level`),
+  KEY `user_id__type` (`user_id`, `type`),
+  KEY `type` (`type`),
+  KEY `auto_generated` (`is_auto_generated`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `items_in_groups` (
   `gid` smallint(10) unsigned NOT NULL,
   `iid` int(10) unsigned NOT NULL,
-  UNIQUE KEY `Index 1` (`gid`,`iid`),
-  KEY `Index 2` (`iid`)
+  UNIQUE KEY `gid_iid` (`gid`,`iid`),
+  KEY `iid` (`iid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `nesting_data` (
@@ -157,9 +116,9 @@ CREATE TABLE IF NOT EXISTS `nesting_data` (
   `level` tinyint(3) unsigned NOT NULL,
   `user_id` smallint(5) unsigned NOT NULL,
   `type` tinyint(3) unsigned NOT NULL,
-  KEY `Index 3` (`level`),
-  KEY `Index 1` (`iid`,`pid`),
-  KEY `Index 2` (`pid`),
+  KEY `level` (`level`),
+  KEY `iid_pid` (`iid`,`pid`),
+  KEY `pid` (`pid`),
   KEY `user_id` (`user_id`),
   KEY `type` (`type`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
@@ -172,75 +131,37 @@ CREATE TABLE IF NOT EXISTS `operdays` (
 CREATE TABLE IF NOT EXISTS `transactions` (
   `tid` int(10) unsigned NOT NULL auto_increment COMMENT 'transaction id',
   `operday` int(10) unsigned NOT NULL,
-  `account_id_from` smallint(5) unsigned NOT NULL,
-  `account_id_to` smallint(5) unsigned NOT NULL,
   `iid` int(10) unsigned NOT NULL,
   `alias_id` int(10) unsigned NOT NULL default '0',
   `tdate` datetime NOT NULL,
   `dateadded` datetime NOT NULL,
   `ctid` int(10) unsigned NOT NULL default '0' COMMENT 'container transaction id',
   `is_displayed` tinyint(3) unsigned NOT NULL default '1',
-  `amount` double NOT NULL,
+  `amount` double unsigned NOT NULL,
   `discount` double NOT NULL,
   `quantity` double unsigned NOT NULL,
   `description` varchar(255) default NULL,
   `type` tinyint(3) unsigned default NULL,
   `user_id` tinyint(3) unsigned NOT NULL,
   PRIMARY KEY  (`tid`),
-  KEY `Index 2` (`operday`),
-  KEY `Index 3` (`account_id_from`),
-  KEY `Index 4` (`iid`),
-  KEY `Index 5` (`tdate`),
-  KEY `Index 6` (`type`),
-  KEY `Index 7` (`user_id`),
-  KEY `Index 8` (`account_id_to`),
-  KEY `Index 9` (`ctid`),
-  KEY `Index 10` (`is_displayed`),
-  KEY `Index 11` (`amount`),
-  KEY `Index 12` (`alias_id`)
+  KEY `is_displayed` (`is_displayed`),
+  KEY `iid` (`iid`),
+  KEY `tdate` (`tdate`),
+  KEY `type` (`type`),
+  KEY `ctid` (`ctid`),
+  KEY `amount` (`amount`),
+  KEY `alias_id` (`alias_id`),
+  KEY `operday` (`operday`),
+  KEY `multiple_key` (`user_id`, `operday`, `type`, `is_displayed`)
+
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8;
 
 CREATE TABLE IF NOT EXISTS `transactions_in_groups` (
   `gid` int(10) unsigned NOT NULL,
   `tid` int(10) unsigned NOT NULL,
-  UNIQUE KEY `Index 1` (`gid`,`tid`),
-  KEY `Index 2` (`tid`)
+  UNIQUE KEY `git_tid` (`gid`,`tid`),
+  KEY `tid` (`tid`)
 ) ENGINE=MyISAM DEFAULT CHARSET=utf8 ROW_FORMAT=FIXED;
-
-CREATE TABLE IF NOT EXISTS `transaction_types` (
-  `type` int(10) unsigned NOT NULL auto_increment,
-  `name` varchar(50) NOT NULL,
-  `description` varchar(255) NOT NULL,
-  KEY `Index 1` (`type`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-CREATE TABLE IF NOT EXISTS `units` (
-  `unit_id` smallint(3) unsigned NOT NULL auto_increment,
-  `name` varchar(50) default NULL,
-  `description` varchar(50) default NULL,
-  `factor` float unsigned NOT NULL default '1',
-  `base_unit_id` smallint(5) unsigned NOT NULL default '0',
-  KEY `Index 1` (`unit_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-CREATE TABLE IF NOT EXISTS `users` (
-  `user_id` tinyint(5) unsigned NOT NULL auto_increment,
-  `fullname` varchar(50) default NULL,
-  `name` varchar(50) default NULL,
-  `password` varchar(100) default NULL,
-  PRIMARY KEY  (`user_id`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
-
-INSERT INTO `transaction_types` (`type`, `name`, `description`) VALUES
-  (1, 'Расход', ''),
-  (2, 'Приход', ''),
-  (4, 'Перемещение', ''),
-  (8, 'Неучтенный', ''),
-  (32, 'Требует подтверждения', ''),
-  (16, 'Требует уточнения', ''),
-  (64, 'Чековая транзакция', ''),
-  (128, 'Банковская транзакция', '')
 
 INSERT INTO auser (auser_id, name, passwd, email, description, auser_type_id, rights, is_published, dt_register) VALUES (1, 'Owner', 'onwner', 'owner', 'Владелец объектов', 2, 16777215, 1, NOW());
 INSERT INTO auser (auser_id, name, passwd, email, description, auser_type_id, rights, is_published, dt_register) VALUES (2, 'Admins', 'group', 'group', 'Все администрирующие пользователи', 1, 16777215, 1, NOW());

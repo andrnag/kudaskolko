@@ -60,6 +60,106 @@ $tbMargin: 0.2em;
 	}
 }
 
+  .ui-autocomplete {
+  	border-radius: 10px;
+  	font-family: 'PT Sans','Open Sans','Helvetica', sans-serif !important;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    max-width: 700px;
+    & .iemobile{
+    	max-width: none !important;
+    }
+
+    .ui-state-highlight,
+    .ui-state-highlight a,
+    .ui-state-hover,
+    .ui-state-hover a,
+    .ui-state-focus,
+    .ui-state-focus a {
+    	/*background-color: $LightGreen  !important;*/
+    }
+.ui-state-default{
+	color: #000 !important;
+}
+.ui-menu-item:hover{
+	.search-link{
+		visibility: visible;
+	}
+	/*background-color: inherit !important;*/
+}
+a.ui-state-hover{
+	/*background: $LightGreen !important;*/
+
+/*	&.search-link{
+		float:left !important;
+	}	*/
+}
+.ui-menu-item{
+	border-bottom: 1px inset #F5F5F5;
+	/*padding:0.3em 0  !important;*/
+	&:last-child{
+		border-bottom: 0;
+	}
+	&:hover, &:hover a{
+		/*background: $LightGreen !important;*/
+	}
+}
+	.hover-search{
+		background-color: #ABCDEF !important;
+	}
+    .ui-menu-item a {
+
+	text-decoration:none;
+	display: inline-block;
+	/*float:left;*/
+	overflow:auto;
+	padding:0.5em .4em;
+	line-height:1.2 !important;
+	zoom:1;
+	&:hover{
+		color: #000 !important;
+		/*background: $LightGreen !important;*/
+	}
+	div.value{
+		padding:.2em 0;
+		&:first-line{
+    		color: #000 !important;
+    		font-size: 115%;
+    	}
+
+    	i{
+    		font-style: normal;
+    		background-color: $LightGreen;
+    		border-radius: 2px;
+    		color: $SuperDarkGreen;
+    		//#F4EA86;
+    	}
+
+	}
+	.search-link{
+		cursor: pointer;
+		float: right;
+		visibility: hidden;
+		color: $Link !important;
+		text-decoration: underline;
+		padding:0 .2em;
+		/*background: $LightGreen;*/
+		&:hover{
+			color: $LinkHover !important;
+			/*background: $LinkBorder;*/
+			&+a{
+				/*background: $LinkBorder;*/
+			}
+		}
+		u{
+			/*font-size: 80%;*/
+		}
+	}
+	}
+  }
+
+
 body{
 	margin:0;//2em;
 	padding:0;
@@ -71,7 +171,7 @@ body{
 }
 
 input,textarea,button{
-	font-family: 'PT Sans','Open Sans','Helvetica',sans-serif;
+	font-family: 'PT Sans','Open Sans','Helvetica', sans-serif;
 }
 
 body.beta .home:after{
@@ -355,6 +455,9 @@ a{
 
 .calendar{
 	/*margin-bottom: 0.5em;*/
+	.iemobile & {
+		display: none !important;
+	}
 }
 
 
@@ -586,8 +689,15 @@ a.day{
 	#incomes,
 	#charges{
 		float: left;
-		margin:0 4em 2em 0;
+		padding:0 4em 2em 0;
 		max-width: 50%;
+		-webkit-box-sizing: border-box;
+		-moz-box-sizing: border-box;
+		box-sizing: border-box;
+		.iemobile & {
+			float: none;
+			max-width: none !important;
+		}
 	}
 
 	#incomes{
@@ -927,6 +1037,9 @@ tr:nth-child(2) td
 
 	td.name{
 		max-width: 600px;
+		.iemobile & {
+			max-width: none !important;
+		}
 	}
 	tr td{
 		border-color: transparent;
@@ -1098,10 +1211,13 @@ tr:nth-child(2) td
 
 	.form{
 
-	padding-left: 1em;
-	margin-left: -1em;
+		padding-left: 1em;
+		margin-left: -1em;
 		width: 100%;
 		max-width: 700px;
+		.iemobile & {
+			max-width: none !important;
+		}
 		padding-right: 1em;
 		#controls{
 			/*margin-bottom: 1em;*/
@@ -1111,6 +1227,7 @@ tr:nth-child(2) td
 
 
 }
+
 
 	#IDAjaxPreview{
 		.active &{
@@ -1203,7 +1320,6 @@ button:focus{
 	color: #333;
 	overflow: auto;
 	width: 100%;
-	//max-width: 800px;
 	min-height: 2.5em;
 	margin-right: 1em;
 	padding: 0.5em;

@@ -1,17 +1,8 @@
 @CLASS
 action
 
-
-@USE
-utils.p
-dbo.p
-common/dtf.p
-
 @OPTIONS
 locals
-
-@auto[]
-$data[^hash::create[]]
 
 @create[hParams]
 $self.hPage[$hParams.hPage]
@@ -159,12 +150,21 @@ $sDate[^dtf:format[%e %h %Y;$tTransaction.tdate;$dtf:rr-locale]]
 ^if(def $form:delete_confirmed){
 	^dbo:deleteTransaction[
 		$.tid(^form:t.int(0))
-		$.isDeleteEmptyCategories(1)
-#  		$.isDeleteSubCategories(0)
+		$.iid(^form:i.int(0))
 		$.isDeleteCheque(^form:delete_cheque.int(0))
 	]
 	$response:location[^goBack[]]
 }{
+	$tCheckName[^oSql.table{
+	SELECT CONCAT('@', i.name) AS name
+		FROM transactions t 
+		LEFT JOIN transactions ct ON t.ctid = ct.tid
+		LEFT JOIN items i ON i.iid = ct.iid
+		WHERE 
+		t.tid = ^form:t.int(0)
+		AND t.ctid != 0
+		AND t.user_id = $self.USERID
+	}[$.limit(1)]]
 
 <div class="action" id="actionDeleteTransaction">	
 	<form action="/" method="get">
@@ -172,7 +172,7 @@ $sDate[^dtf:format[%e %h %Y;$tTransaction.tdate;$dtf:rr-locale]]
 	$.action[delete_transaction]
 	$.delete_confirmed[true]
 	$.t[^form:t.int(0)]
-
+	$.i[^form:i.int(0)]
 ]
 	<h2><span class="operamini">Удалить запись</span>
 	<span id="IDDeleteConfirm" class="notoperamini">Удалить запись...</span>
@@ -180,7 +180,9 @@ $sDate[^dtf:format[%e %h %Y;$tTransaction.tdate;$dtf:rr-locale]]
 	</h2>
 	<div class="controls">
  		<input type="submit" value="Да, удалить"/>
- 		<input type="checkbox" id="IDDeleteCheque" name="delete_cheque" value="1"/><label for="IDDeleteCheque">Удалить весь чек</label>
+ 		^if($tCheckName){
+	 		<input type="checkbox" id="IDDeleteCheque" name="delete_cheque" value="1"/><label for="IDDeleteCheque">Удалить весь чек $tCheckName.name</label>
+ 		}
 	</div>
 	</form>
 
@@ -366,9 +368,9 @@ $self.hPage.sTitle[$tValues.name]
 
 $value(^if((def $tValues.countOfEntries && $tValues.countOfEntries > 1) 
 	|| 
-	($tValues.type & $dbo:TYPES.CHARGE == $dbo:TYPES.CHARGE)
+	($tValues.type & $TransactionType:CHARGE == $TransactionType:CHARGE)
 	|| 
-	($tValues.type & $dbo:TYPES.INCOME == $dbo:TYPES.INCOME) ){0}{1})
+	($tValues.type & $TransactionType:INCOME == $TransactionType:INCOME) ){0}{1})
 
 <h2>Переименовать 
 ^if(def $tValues.countOfEntries && $tValues.countOfEntries > 1){
@@ -451,10 +453,6 @@ $tParents[^dbo:getParentItems[$.iid($iid)]]
 
 
 @moveCategory[]
-^rem{
-	сделать запрет перемещения корневых категорий и категорий в свои подкатегории
-}
-
 
 ^if(def $form:path){
 
@@ -479,20 +477,15 @@ $tParents[^dbo:getParentItems[$.iid($iid)]]
 	$cookie:lastcategory[$form:path]
 	$tPath[^form:path.split[,;;p]]
 $iFinalItemID(0)
-# ^u:p[^tPath.count[]]
 ^if($tPath > 1){
 	$iFinalItemID(0)
 	^tPath.menu{
 		^if(def ^tPath.p.trim[]){
 			^if(^tPath.line[] == 1){
-
 				$hItem[^dbo:createItem[$.name[^u:capitalizeString[^tPath.p.trim[]]]]]
-# 				^u:p[$hItem.tValues.iid]
 			}{
 				$hItem[^dbo:createItem[$.name[^u:capitalizeString[^tPath.p.trim[]]]$.pid[$iFinalItemID]]]
-# 				$t[^oSql.table{SELECT * FROM items WHERE iid = $hItem.tValues.iid}]
-# 				$tc[^t.columns[]]
-# 				^u:p[^tc.menu{$tc.column=$t.[$tc.column]}[, ]]
+
 			}
 
 			$iFinalItemID($hItem.tValues.iid)
@@ -502,15 +495,8 @@ $iFinalItemID(0)
 	$hItem[^dbo:createItem[$.name[^u:capitalizeString[^form:path.trim[]]]$.iid[^form:i.int(0)]]]
 	$iFinalItemID($hItem.tValues.iid)
 }
-# ^u:p[$iFinalItemID]
-#	$iItemID(^createItemAndReturnIfNotExist[^form:path.trim[]])
-# ^u:p[		SELECT i.iid FROM items i
-# 		LEFT JOIN items i2 ON i2.name = i.name
-# 		WHERE 
-# 		i.pid = $hItem.tValues.pid
-# 		AND i2.iid = ^form:i.int(0)
-# 		AND i.iid <> i.pid]
-	$tExist[^oSql.table{
+
+	$tExistIid(^oSql.int{
 		SELECT i.iid FROM items i
 		LEFT JOIN items i2 ON i2.name = i.name
 		WHERE
@@ -518,20 +504,12 @@ $iFinalItemID(0)
 		AND i.pid = $hItem.tValues.pid
 		AND i2.iid = ^form:i.int(0)
 		AND i.iid <> i2.iid
-
-# 		SELECT= iid
-# 		FROM items
-# 		WHERE 
-# 			iid = ^form:i.int(0)
-# 			pid = $hItem.tValues.pid
-# 			AND iid <> pid
-# 			AND name = '^u:capitalizeString[^form:path.trim[]]'
-		}[$.limit(1)]]
-# 		^u:p[UPDATE transactions SET iid = $tExist.iid WHERE iid = ^form:i.int(0)]
-	^if($tExist){
-		$iFinalItemID($tExist.iid)
+		}[$.limit(1)
+		$.default(0)])
+	^if($tExistIid != 0){
+		$iFinalItemID($tExistIid)
 		^oSql.void{
-			UPDATE transactions SET iid = $tExist.iid 
+			UPDATE transactions SET iid = $iFinalItemID 
 			WHERE iid = ^form:i.int(0)
 			AND user_id = $self.USERID
 		}
@@ -539,21 +517,11 @@ $iFinalItemID(0)
 		^dbo:deleteItem[$.iid(^form:i.int(0))]
 
 	}{
-		^oSql.void{
-			UPDATE items SET pid = $iFinalItemID
-			WHERE iid = ^form:i.int(0)
-			AND user_id = $self.USERID
-		}
-
-		^dbo:rebuildNestingDataLocal[
+		^dbo:moveCategory[
 			$.iid(^form:i.int(0))
 			$.pid($iFinalItemID)
 		]
-
 	}
-
-# ^dbo:collapseChequeTransactions[$.iid(^form:i.int(0))]
-
 
 $response:location[^goBack[
 ^if(!(^form:expanded.int(0) || ^form:detailed.int(0))){

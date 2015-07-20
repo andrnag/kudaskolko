@@ -137,29 +137,6 @@ CREATE TABLE IF NOT EXISTS `groups` (
 -- Data exporting was unselected.
 
 
--- Dumping structure for table kudaskolko.importdata
-CREATE TABLE IF NOT EXISTS `importdata` (
-  `id` int(10) unsigned NOT NULL AUTO_INCREMENT,
-  `ck_number` int(10) unsigned DEFAULT NULL,
-  `cash_code` int(10) unsigned DEFAULT NULL,
-  `ck_amount` double DEFAULT NULL,
-  `goodsname` varchar(256) DEFAULT NULL,
-  `quantity` double unsigned DEFAULT NULL,
-  `unitname` varchar(50) DEFAULT NULL,
-  `amount` double unsigned DEFAULT NULL,
-  `discount` double unsigned DEFAULT NULL,
-  `date` datetime DEFAULT NULL,
-  `barcode` varchar(20) DEFAULT NULL,
-  `operday` int(10) unsigned DEFAULT NULL,
-  `taken` tinyint(3) unsigned NOT NULL,
-  PRIMARY KEY (`id`),
-  KEY `Index 2` (`operday`),
-  KEY `Index 3` (`taken`)
-) ENGINE=MyISAM DEFAULT CHARSET=utf8;
-
--- Data exporting was unselected.
-
-
 -- Dumping structure for table kudaskolko.items
 CREATE TABLE IF NOT EXISTS `items` (
   `iid` int(10) unsigned NOT NULL AUTO_INCREMENT,
