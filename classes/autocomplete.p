@@ -193,7 +193,9 @@ $result[^oSql.table{
 	AND amount <> 0
 	AND t.type & $TransactionType:ACCOUNT = 0
 	GROUP BY t.amount
-	ORDER BY cnt desc
+	HAVING COUNT(t.amount) > 3
+	ORDER BY t.tdate DESC, cnt DESC
+
 	}[$.limit(3)]
 ]
 

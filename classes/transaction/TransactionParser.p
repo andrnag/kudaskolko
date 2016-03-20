@@ -63,52 +63,49 @@ $patternParseTransactionPattern[^getParseTransactionPattern[]]
 
 $result[^aTransactions.getHash[]]
 
+
 @getParseTransactionPattern[]
 $result[^regex::create[
 ^^\s*
 
-(?:(-)\s*)? # 1 isSubTransaction
+(?:(^getDatePattern[])\s+)? # 1 sDate
 
-(?:(^getDatePattern[])\s+)? # 1.5 sDate
+(?:(-)\s*)? # 2 isSubTransaction
+(?:(@)\s*)? # 3 isCheque
+(?:(\^$)\s*)? # 4 isAccount
 
-# (q)? # 1.5 sDate
-(?:([@\^$])\s*)? # 1.6 isChequeOrAccount1
-(.+?) # 2 sName
-#
-(?:(?:\s+
-	([\d\.,]+) # 3 dChequeAmount
-	)?+\s*
-	(\:) # 4 isCheque
-	\s*^$
-)?
+(.+?) # 5 sName
 
-(?:\s+(?:(?:
+(?:\s+
 
-# вариант Молоко 300*2, Молоко 200, Молоко 200/3
-
-	(?:([-\+=]|=(?:\s*))?([\d\.,]+|\([ \*\+\d\.,-]+\))) # 4.5 type 5 sAmount || sPrice || quantity || expression
+	(?:([-\+])\s*)? # 6 sChargeOrIncome
 
 	(?:
-		\s*
-		([\\/]|\*) # 6 sAmountOrPrice ( \/ - amount, * - price)
-		\s*
-
+		# с жестким =, после которого можно использовать пробелы между знаками
 		(?:
-			([\d\.,]+)?  # 7 dQuantity || || sPrice || quantity
+			(?:(=)\s*) # 7 isSubtotal
+			([\d\.,\*\\/\+\-\s]+) # 8 sSumExpressionToEvaluate
 		)
-	\s*)?
 	|
-# вариант Молоко 2 по 300, 3 за 100
-	(?:
-		([\d\.,]+)  # 10 dQuantity2
+		# без суммирования
+		(?:
+			([\d\.,]+) # 9 sumOrPrice
+			(?:\s*
+				(?:
+				[\\/]\s*([\d\.,]+) # 10 /perQuantity
+				|
+				\*\s*([\d\.,]+) # 11 *forQuantity
+				)
+			)?
+		)
+	|
+		# с неразрывным суммированием
+		(?:
+			([\d\.,\*\\/\+\-]+) # 12 sSumExpressionWithoutSpacesToEvaluate
+		)
 	)
-	\s*
-	(\x{043f}\x{043e}|\x{0437}\x{0430}) # 12 sAmountOrPrice2 (sAmount2)( по - price, за - amount)
-	\s*
-	(?:([-\+=])?([\d\.,]+)) # 13 type2 14 sAmount3 || sPrice
-
-)\s*))?
-		^$][gmxi]]
+)?\s*
+^$][gmxi]]
 
 @parseTransaction[sTransaction;pattern][locals]
 $hResult[^hash::create[]]
@@ -117,20 +114,18 @@ $tTransaction[^sTransaction.match[$pattern]]
 
 ^rem{ последовательность ключей соответствует последовательности полей в шаблоне match }
 $hStr[
-	$.isSubTransaction(1)
 	$.sDate(1)
-	$.isChequeOrAccount1(1)
-	$.sName(1)
-	$.dChequeAmount(1)
+	$.isSubTransaction(1)
 	$.isCheque(1)
-	$.type(1)
-	$.sAmount(1)
-	$.sAmountOrPrice(1)
-	$.dQuantity(1)
-	$.dQuantity2(1)
-	$.sAmountOrPrice2(1)
-	$.type2(1)
-	$.sAmountOrsPrice2(1)
+	$.isAccount(1)
+	$.sName(1)
+	$.sChargeOrIncome(1)
+	$.isSubtotal(1)
+	$.sSumExpressionToEvaluate(1)
+	$.sumOrPrice(1)
+	$.perQuantity(1)
+	$.forQuantity(1)
+	$.sSumExpressionWithoutSpacesToEvaluate(1)
 ]
 $h[^hash::create[]]
 $i(1)
@@ -140,82 +135,101 @@ $i(1)
 	^i.inc[]
 }
 
+^if(def $h.sDate){
+	$hResult.dtTransDate[^u:stringToDate[$h.sDate]]
+}
+
 $hResult.sName[^u:capitalizeString[^h.sName.left(255)]]
-^if(def $h.sAmountOrPrice2){
-	$h.dQuantity[$h.dQuantity2]
-	$h.type[$h.type2]
-	$h.sAmount[$h.sAmountOrsPrice2]
-	^if($h.sAmountOrPrice2 eq 'по'){
-		$h.sAmountOrPrice[*]
+$hResult.dQuantity(1)
+$hResult.iType(^calculateTransactionType[$h.sChargeOrIncome](def $h.isAccount;def $h.isSubtotal))
+
+^if(def $h.sumOrPrice){
+	$hResult.dAmount(^u:stringToDouble[$h.sumOrPrice])
+
+	^if(def $h.perQuantity){
+		$hResult.dQuantity(^u:stringToDouble[$h.perQuantity](1))
+	}
+
+	^if(def $h.forQuantity){
+		$hResult.dQuantity(^u:stringToDouble[$h.forQuantity](1))
+		$hResult.dAmount($hResult.dAmount * $hResult.dQuantity)
 	}
 }
 
-$hResult.sAmount[$h.sAmount]
-^if(def $hResult.sAmount){
-	^if(^hResult.sAmount.left(1) eq "(" && ^hResult.sAmount.right(1) eq ")"){
-		$hResult.sAmount[^hResult.sAmount.trim[both;^(^)]]
-		$hResult.sAmount[^hResult.sAmount.replace[-;+-]]
-		$tSplittedSum[^hResult.sAmount.split[+]]
-		$hResult.dQuantity(0)
-		$hResult.dAmount(0)
-		
-		^tSplittedSum.menu{
+$sExpression[]
+
+^if(def $h.sSumExpressionToEvaluate){
+	$sExpression[$h.sSumExpressionToEvaluate]
+}
+
+^if(def $h.sSumExpressionWithoutSpacesToEvaluate){
+	$sExpression[$h.sSumExpressionWithoutSpacesToEvaluate]
+}
+
+
+^if(def $sExpression){
+	$sExpression[^sExpression.replace[\;/]]
+	$sExpression[^sExpression.replace[-;+-]]
+	$tSplittedSum[^sExpression.split[+]]
+	$hResult.dQuantity(0)
+	$hResult.dAmount(0)
+
+	^tSplittedSum.menu{
+		^if(^u:contains[$tSplittedSum.piece;*]){
 			$tSplittedMultiple[^tSplittedSum.piece.split[*;h]]
 			$dCurrentQuantity(^u:stringToDouble[$tSplittedMultiple.1](1))
 			$dCurrentAmount(^u:stringToDouble[$tSplittedMultiple.0](0) * $dCurrentQuantity)
-			^hResult.dAmount.inc($dCurrentAmount)
-			^if($dCurrentAmount > 0){
-				^hResult.dQuantity.inc($dCurrentQuantity)
+
+		}{
+			^if(^u:contains[$tSplittedSum.piece;/]){
+				$tSplittedDivision[^tSplittedSum.piece.split[/;h]]
+				$dCurrentQuantity(^u:stringToDouble[$tSplittedDivision.1](1))
+				$dCurrentAmount(^u:stringToDouble[$tSplittedDivision.0](0))
+			}{
+				$dCurrentQuantity(1)
+				$dCurrentAmount(^u:stringToDouble[$tSplittedSum.piece](0))
 			}
 		}
-		^if( !($hResult.dQuantity > 0) ){
-			$hResult.dQuantity(1)
-		}
-	}{
-		$hResult.dQuantity(^u:stringToDouble[$h.dQuantity](1))
-		$hResult.dAmount(^u:stringToDouble[$hResult.sAmount])
-		^if($hResult.dQuantity != 0 && $h.sAmountOrPrice eq "*"){
-			$hResult.dAmount($hResult.dAmount * $hResult.dQuantity)
+		^hResult.dAmount.inc($dCurrentAmount)
+		^if($dCurrentAmount > 0){
+			^hResult.dQuantity.inc($dCurrentQuantity)
 		}
 	}
-
-
-	$hResult.dAmountWithoutDisc($hResult.dAmount)
-
-	$hResult.iType(^calculateTransactionType[$h.type;$h.isChequeOrAccount1])
 }
+^if($hResult.dQuantity <= 0){
+	$hResult.dQuantity(1)
+}
+$hResult.dAmountWithoutDisc($hResult.dAmount)
 
 $hResult.isSubTransaction(def $h.isSubTransaction && def $hResult.dAmount)
-^if((!def $hResult.sAmount && def $h.isCheque) || $h.isChequeOrAccount1 eq "@"){
-	^if(def $h.dChequeAmount){
-		$hResult.dChequeAmount(^u:stringToDouble[$h.dChequeAmount])
-	}
-	^if(def $h.sAmount){
-		$hResult.dChequeAmount(^u:stringToDouble[$h.sAmount])
+^if(def $h.isCheque){
+	^if(def $hResult.dAmount){
+		$hResult.dChequeAmount($hResult.dAmount)
 	}
 	$hResult.isCheque(true)
 	$hResult.sChequeName[$hResult.sName]
 	$hResult.sName[]
 }
-^if(def $h.sDate){
-	$hResult.dtTransDate[^u:stringToDate[$h.sDate]]
-}
+
 $result[$hResult]
 
 
-@calculateTransactionType[sType;sIsCheckOrAccount]
-^if($sIsCheckOrAccount eq "^$"){
-	$result(
-	^switch[$sType]{
-		^case[+]($TransactionType:INCOME | $TransactionType:ACCOUNT)
-		^case[-]($TransactionType:CHARGE | $TransactionType:ACCOUNT)
-		^case[=]($TransactionType:STATEMENT | $TransactionType:ACCOUNT)
-		^case[DEFAULT]($TransactionType:INCOME | $TransactionType:ACCOUNT)
-	})
-}{
-	^if(def $sType){
+@calculateTransactionType[sChargeOrIncome;isAccount;isSubtotal]
+^if($isAccount){
+	^if($isSubtotal){
+		$result($TransactionType:STATEMENT | $TransactionType:ACCOUNT)
+	}{
 		$result(
-		^switch[$sType]{
+		^switch[$sChargeOrIncome]{
+			^case[+]($TransactionType:INCOME | $TransactionType:ACCOUNT)
+			^case[-]($TransactionType:CHARGE | $TransactionType:ACCOUNT)
+			^case[DEFAULT]($TransactionType:INCOME | $TransactionType:ACCOUNT)
+		})
+	}
+}{
+	^if(def $sChargeOrIncome){
+		$result(
+		^switch[$sChargeOrIncome]{
 			^case[+]($TransactionType:INCOME)
 			^case[-]($TransactionType:CHARGE)
 		})

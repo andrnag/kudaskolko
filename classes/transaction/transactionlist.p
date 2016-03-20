@@ -193,7 +193,7 @@ $h.iTotalSum(^dbo:getTotalOut[
 	}
 
 $hCurrent.value[^u:formatValueByType($tEntries.sum;$hParams.type)]
-$hCurrent.percent[^u:formatValue(100*$tEntries.sum/$h.iTotalSum)]
+$hCurrent.percent[^calculatePercent($tEntries.sum;$h.iTotalSum)]
 
 	^if($tEntries.has_children == 0 &&
 		$tEntries.count_of_transactions == 1 &&
@@ -223,11 +223,18 @@ $hTransactions.0.no_entries[nodata]
 	$hCurrent.name[Прочее в категории $hTransactions.0.name]
 	$hCurrent.quantity[$h.dRestQuantity]
 	$hCurrent.value[^u:formatValueByType($h.iSum;$hParams.type)]
-	$hCurrent.percent[^u:formatValue(100*$h.iSum/$h.iTotalSum)]
+	$hCurrent.percent[^calculatePercent($h.iSum;$h.iTotalSum)]
 
 }
 
 ^printTransactions[$hTransactions;$hParams]
+
+@calculatePercent[iPositionSum;iTotalSum]
+^if($iTotalSum == 0){
+	$result[0]
+}{
+	$result[^u:formatValue(100 * $iPositionSum / $iTotalSum)]
+}
 
 @printTransactions[hTransactions;hParams]
 $hTransactions[^hash::create[$hTransactions]]

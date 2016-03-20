@@ -114,7 +114,7 @@ $dChequeAmount(-1)
  		$dFinalPositionSum($v.dChequeAmount)
 		$dChequeAmount($v.dChequeAmount)
 	}{
-		^if($dChequeAmount > -1 && ($dPositionSum - $dChequeAmount) > 0 && def $v.sAmount){
+		^if($dChequeAmount > -1 && ($dPositionSum - $dChequeAmount) > 0 && def $v.dAmount){
 			$dDiscAmount(^math:round($v.dAmount*$dChequeAmount / $dPositionSum * 100)/100)
 			$v.dDiscount($v.dAmount - $dDiscAmount)
 			$v.dAmount($dDiscAmount)
@@ -309,8 +309,7 @@ cols="50" rows="10">^if(def $sData){^untaint[as-is]{$sData}}</textarea>
 Сок 50*2 - сок ценой 50 в количестве 2 -> на сумму 100 рублей - для автоматического вычисления и учета количества
 Сок 100/2 - сок на сумму 150 в количестве 3 - для учета количества
 
-2. Можно включить позиции в чек, написав перед ними название магазина с ^@ в начале
-или двоеточием в конце:
+2. Можно включить позиции в чек, написав перед ними название магазина с ^@ в начале:
 
 ^@Лента
 Молоко 50
@@ -320,7 +319,7 @@ cols="50" rows="10">^if(def $sData){^untaint[as-is]{$sData}}</textarea>
 если на чек дана скидка, но в бумажном чеке позиций указаны без учета скидок,
 то можно указать сумму чека, чтобы вычислить суммы позиций со скидкой:
 
-Окей 200:
+^@Окей 200
 Молоко 150
 Сок 150
 

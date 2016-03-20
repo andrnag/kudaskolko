@@ -758,8 +758,7 @@ WHERE
 transaction_for_last_parent_nd.type = ^hParams.type.int($TransactionType:CHARGE)
 AND t2.user_id = $USERID
  AND i.user_id = $USERID AND
-(last_parent_nd.level = transaction_for_last_parent_nd.level-1 
-OR transaction_for_last_parent_nd.level = 0)
+(transaction_for_last_parent_nd.level = 0 OR last_parent_nd.level = transaction_for_last_parent_nd.level - 1)
 AND
 last_parent_nd.pid = last_parent_nd.iid
 

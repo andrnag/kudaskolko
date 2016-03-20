@@ -313,6 +313,9 @@ $sSum[^u:formatValueByType($iMonthSum;$iType;true)]
 # 	$sFullSumm[$sSum]
 	^if($iType == $TransactionType:CHARGE){
 		$sSum[^u:formatValueByDivision($iMonthSum;1000;true)]
+		^if($iMonthSum < 1000){
+			$sSum[^u:formatValueWithoutCeiling(^u:ceiling($iMonthSum/1000;3))]
+		}
 	}{
 		$sSum[^u:formatValueByDivisionFloor($iMonthSum;1000;true)]
 		^if($iMonthSum < 1000){
@@ -320,9 +323,8 @@ $sSum[^u:formatValueByType($iMonthSum;$iType;true)]
 		}
 	}
 }
-
 ^if(def $iMonthSum){
-	$iHeight(^if($dTotalSum > 0;(^math:round(100 *$iMonthSum / $dTotalSum)-1);0))
+	$iHeight(^if($dTotalSum > 0;^u:max(^math:round(100 * $iMonthSum / $dTotalSum) - 1;0);0))
 	^if(def $form:log){
 		$iHeight(^if($dTotalSum > 0;^math:round(100 *^math:log($iMonthSum) / ^math:log($dTotalSum));0))
 	}

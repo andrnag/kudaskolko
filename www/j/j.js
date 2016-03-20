@@ -659,8 +659,7 @@ $(function() {
 	});
 
 	$(".months.pm .bar-container").click(function(e){
-		if($(".months.pm").find(".bar.plus").length == 0 ||
-		   $(".months.pm").find(".bar.minus").length == 0)
+		if($(".months.pm").find(".bar.plus").length == 0 && $(".months.pm").find(".bar.minus").length == 0)
 			return;
 
 		if( ($(".months").hasClass("p") && $(".months").hasClass("m")) ||
